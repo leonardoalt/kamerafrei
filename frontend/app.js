@@ -392,15 +392,6 @@ function setupSearch(which) {
 setupSearch("a");
 setupSearch("b");
 
-// deep link: #r=latA,lonA,latB,lonB sets both markers and routes immediately
-const routeHash = location.hash.match(
-  /(?:^#|&)r=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/
-);
-if (routeHash) {
-  setPoint("a", L.latLng(+routeHash[1], +routeHash[2]));
-  setPoint("b", L.latLng(+routeHash[3], +routeHash[4]));
-}
-
 /* ---------------- controls ---------------- */
 
 alphaEl.addEventListener("input", () => {
@@ -585,4 +576,16 @@ function fillStats(s, a) {
   document.getElementById("a-cams").textContent = a.n_cameras;
   document.getElementById("s-exp").textContent = fmtDist(s.exposed_m);
   document.getElementById("a-exp").textContent = fmtDist(a.exposed_m);
+}
+
+/* ---------------- deep link ----------------------------------------------- */
+/* #r=latA,lonA,latB,lonB sets both markers and routes immediately.
+   Must run last: requestRoute reads consts declared above. */
+
+const routeHash = location.hash.match(
+  /(?:^#|&)r=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/
+);
+if (routeHash) {
+  setPoint("a", L.latLng(+routeHash[1], +routeHash[2]));
+  setPoint("b", L.latLng(+routeHash[3], +routeHash[4]));
 }
