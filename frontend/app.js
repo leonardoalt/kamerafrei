@@ -28,7 +28,8 @@ const STR = {
       'Camera data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
       "contributors (<code>man_made=surveillance</code>), as visualized by " +
       '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
-      "Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only.",
+      "Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only. " +
+      'Address search by <a href="https://nominatim.org">Nominatim</a>.',
     loading: "Loading cameras …",
     setStart: "Tap the map to set start.",
     camsLoaded: (n) => `${n} known cameras loaded. Tap the map to set start.`,
@@ -41,6 +42,10 @@ const STR = {
     offNone: "Shortest path — passes no known cameras.",
     popupCamera: "camera",
     noCamData: "no camera data on the server",
+    phStart: "Start address …",
+    phDest: "Destination address …",
+    searching: "Searching …",
+    noResults: "No results in Berlin.",
   },
   de: {
     subtitle:
@@ -64,7 +69,8 @@ const STR = {
       'Kameradaten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-' +
       "Mitwirkende (<code>man_made=surveillance</code>), visualisiert von " +
       '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
-      "Die Abdeckung ist <strong>unvollständig</strong>: Es werden nur <em>bekannte</em> Kameras gemieden.",
+      "Die Abdeckung ist <strong>unvollständig</strong>: Es werden nur <em>bekannte</em> Kameras gemieden. " +
+      'Adresssuche via <a href="https://nominatim.org">Nominatim</a>.',
     loading: "Lade Kameras …",
     setStart: "Tippe auf die Karte für den Start.",
     camsLoaded: (n) => `${n} bekannte Kameras geladen. Tippe auf die Karte für den Start.`,
@@ -77,6 +83,10 @@ const STR = {
     offNone: "Kürzester Weg — passiert keine bekannten Kameras.",
     popupCamera: "Kamera",
     noCamData: "keine Kameradaten auf dem Server",
+    phStart: "Startadresse …",
+    phDest: "Zieladresse …",
+    searching: "Suche …",
+    noResults: "Keine Treffer in Berlin.",
   },
 }[LANG];
 
@@ -86,11 +96,26 @@ document.querySelectorAll("[data-i18n]").forEach((el) => {
 document.querySelectorAll("[data-i18n-html]").forEach((el) => {
   el.innerHTML = STR[el.dataset.i18nHtml];
 });
+document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
+  el.placeholder = STR[el.dataset.i18nPh];
+});
 
 /* ---------------- map ---------------------------------------------------- */
 
-const map = L.map("map", { zoomControl: false }).setView([52.503, 13.424], 14);
+// shareable view: #map=zoom/lat/lon, like openstreetmap.org
+function viewFromHash() {
+  const m = location.hash.match(/^#map=(\d+)\/(-?[\d.]+)\/(-?[\d.]+)$/);
+  return m ? { zoom: +m[1], center: [+m[2], +m[3]] } : null;
+}
+
+const initialView = viewFromHash() || { zoom: 14, center: [52.503, 13.424] };
+const map = L.map("map", { zoomControl: false }).setView(initialView.center, initialView.zoom);
 L.control.zoom({ position: "bottomright" }).addTo(map);
+
+map.on("moveend", () => {
+  const c = map.getCenter();
+  history.replaceState(null, "", `#map=${map.getZoom()}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`);
+});
 
 // params live in a collapsible panel; phones start collapsed so the map wins
 const panel = document.getElementById("panel");
@@ -161,6 +186,40 @@ function cameraPopup(props) {
           <table class="cam-tags">${rows}</table>`;
 }
 
+// camera:direction is degrees clockwise from north, or a cardinal like "SW";
+// multiple directions are separated by ";"
+const CARDINALS = {
+  N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5,
+  S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5,
+};
+
+function parseDirections(value) {
+  if (value == null) return [];
+  return String(value)
+    .split(/[;,]/)
+    .map((s) => {
+      s = s.trim().toUpperCase();
+      if (s in CARDINALS) return CARDINALS[s];
+      const n = parseFloat(s);
+      return Number.isNaN(n) ? null : ((n % 360) + 360) % 360;
+    })
+    .filter((d) => d !== null);
+}
+
+function coneLatLngs(latlng, bearing, radiusM = 35, halfAngle = 30) {
+  const points = [latlng];
+  const latScale = 111320;
+  const lngScale = 111320 * Math.cos((latlng.lat * Math.PI) / 180);
+  for (let a = bearing - halfAngle; a <= bearing + halfAngle + 0.01; a += 7.5) {
+    const rad = (a * Math.PI) / 180;
+    points.push([
+      latlng.lat + (Math.cos(rad) * radiusM) / latScale,
+      latlng.lng + (Math.sin(rad) * radiusM) / lngScale,
+    ]);
+  }
+  return points;
+}
+
 fetch("/api/cameras")
   .then((r) => {
     if (!r.ok) throw new Error(STR.noCamData);
@@ -178,6 +237,23 @@ fetch("/api/cameras")
           fillOpacity: 0.6,
         }).bindPopup(cameraPopup(feat.properties)),
     }).addTo(cameraLayer);
+
+    // view cones for cameras with a tagged direction (domes see 360°, skip)
+    for (const feat of geojson.features) {
+      const props = feat.properties;
+      if (props["camera:type"] === "dome") continue;
+      const [lng, lat] = feat.geometry.coordinates;
+      for (const bearing of parseDirections(props["camera:direction"])) {
+        L.polygon(coneLatLngs(L.latLng(lat, lng), bearing), {
+          renderer: canvas,
+          stroke: false,
+          fillColor: "#dc2626",
+          fillOpacity: 0.13,
+          interactive: false,
+        }).addTo(cameraLayer);
+      }
+    }
+
     setStatus(STR.camsLoaded(geojson.features.length));
   })
   .catch((err) => setStatus(err.message, true));
@@ -193,20 +269,24 @@ function pinIcon(label, cls) {
   });
 }
 
-map.on("click", (e) => {
-  if (!markerA) {
-    markerA = L.marker(e.latlng, { draggable: true, icon: pinIcon("A", "marker-a") }).addTo(map);
-    markerA.on("dragend", requestRoute);
-    setStatus(STR.setDest);
-  } else if (!markerB) {
-    markerB = L.marker(e.latlng, { draggable: true, icon: pinIcon("B", "marker-b") }).addTo(map);
-    markerB.on("dragend", requestRoute);
-    requestRoute();
+function setPoint(which, latlng) {
+  if (which === "a") {
+    if (markerA) markerA.setLatLng(latlng);
+    else {
+      markerA = L.marker(latlng, { draggable: true, icon: pinIcon("A", "marker-a") }).addTo(map);
+      markerA.on("dragend", requestRoute);
+    }
+  } else if (markerB) {
+    markerB.setLatLng(latlng);
   } else {
-    markerB.setLatLng(e.latlng);
-    requestRoute();
+    markerB = L.marker(latlng, { draggable: true, icon: pinIcon("B", "marker-b") }).addTo(map);
+    markerB.on("dragend", requestRoute);
   }
-});
+  if (markerA && markerB) requestRoute();
+  else setStatus(markerA ? STR.setDest : STR.setStart);
+}
+
+map.on("click", (e) => setPoint(!markerA ? "a" : "b", e.latlng));
 
 document.getElementById("clear").addEventListener("click", () => {
   if (markerA) map.removeLayer(markerA);
@@ -214,8 +294,65 @@ document.getElementById("clear").addEventListener("click", () => {
   markerA = markerB = null;
   routeLayer.clearLayers();
   statsEl.hidden = true;
+  document.getElementById("search-a").value = "";
+  document.getElementById("search-b").value = "";
   setStatus(STR.setStart);
 });
+
+/* ---------------- address search (Nominatim) ----------------------------- */
+
+const BERLIN_VIEWBOX = "13.088,52.675,13.761,52.338";
+
+function setupSearch(which) {
+  const input = document.getElementById(`search-${which}`);
+  const box = document.getElementById(`search-${which}-results`);
+
+  const hint = (text) => {
+    box.innerHTML = `<li class="hint">${text}</li>`;
+    box.hidden = false;
+  };
+
+  input.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
+    const q = input.value.trim();
+    if (!q) return;
+    hint(STR.searching);
+    try {
+      const params = new URLSearchParams({
+        format: "jsonv2",
+        limit: "5",
+        "accept-language": LANG,
+        viewbox: BERLIN_VIEWBOX,
+        bounded: "1",
+        q,
+      });
+      const r = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+      const hits = await r.json();
+      if (!hits.length) return hint(STR.noResults);
+      box.innerHTML = "";
+      for (const h of hits) {
+        const li = document.createElement("li");
+        li.textContent = h.display_name;
+        li.addEventListener("click", () => {
+          box.hidden = true;
+          input.value = h.display_name;
+          const latlng = L.latLng(+h.lat, +h.lon);
+          map.setView(latlng, Math.max(map.getZoom(), 15));
+          setPoint(which, latlng);
+        });
+        box.appendChild(li);
+      }
+      box.hidden = false;
+    } catch {
+      hint(STR.noResults);
+    }
+  });
+
+  input.addEventListener("blur", () => setTimeout(() => (box.hidden = true), 250));
+}
+
+setupSearch("a");
+setupSearch("b");
 
 /* ---------------- controls ---------------- */
 

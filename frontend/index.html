@@ -23,7 +23,7 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
   <div id="map"></div>
@@ -39,6 +39,15 @@
     <div id="panel-body">
     <p class="subtitle" data-i18n-html="subtitle">Routes that avoid known surveillance cameras.<br />
       Tap the map to set start and destination.</p>
+
+    <div class="search">
+      <input id="search-a" data-i18n-ph="phStart" placeholder="Start address …" autocomplete="off" />
+      <ul id="search-a-results" class="results" hidden></ul>
+    </div>
+    <div class="search">
+      <input id="search-b" data-i18n-ph="phDest" placeholder="Destination address …" autocomplete="off" />
+      <ul id="search-b-results" class="results" hidden></ul>
+    </div>
 
     <div class="row">
       <label class="seg">
@@ -87,6 +96,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

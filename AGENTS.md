@@ -110,11 +110,14 @@ compute_exposure.py per-edge     routing.py Router (A*,
 ## Roadmap (not built yet)
 
 1. Client-side routing (static hosting, no server RAM).
-2. View-cone exposure model + building shadowing.
-3. Address search (Nominatim), direction cones on camera markers.
-4. Other cities (pipeline is city-agnostic — only place/bbox changes).
-5. OsmAnd/BRouter integration (no-go files from camera data).
-6. Weekly camera-refresh cron on the deployment.
+2. View-cone exposure model + building shadowing (display cones exist;
+   routing exposure still uses 25 m discs).
+3. Other cities (pipeline is city-agnostic — only place/bbox changes).
+4. OsmAnd/BRouter integration (no-go files from camera data).
+5. Weekly camera-refresh cron on the deployment.
+
+Done: address search (Nominatim, client-side, Berlin-bounded), direction
+cones on the map from camera:direction, shareable #map=zoom/lat/lon URLs.
 
 ## Known limitations (communicate honestly in UI/docs)
 
