@@ -9,7 +9,7 @@ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 const canvas = L.canvas({ padding: 0.3 });
 const cameraLayer = L.layerGroup().addTo(map);
-const routeLayer = L.layerGroup().addTo(map);
+const routeLayer = L.featureGroup().addTo(map);
 
 const statusEl = document.getElementById("status");
 const statsEl = document.getElementById("stats");
