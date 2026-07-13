@@ -27,9 +27,10 @@
     </div>
 
     <div class="row slider-row">
-      <label for="alpha">camera avoidance</label>
-      <input type="range" id="alpha" min="0" max="60" step="5" value="15" />
-      <span id="alpha-value">15×</span>
+      <label for="alpha">avoid cameras</label>
+      <input type="range" id="alpha" min="0" max="3" step="1" value="2"
+             title="how far out of your way to go to stay out of camera view" />
+      <span id="alpha-value"></span>
     </div>
 
     <div id="status">Loading cameras …</div>
@@ -47,9 +48,9 @@
     </table>
 
     <div class="legend">
-      <span><i class="sw sw-short"></i> shortest</span>
-      <span><i class="sw sw-avoid"></i> low-camera</span>
-      <span><i class="sw sw-exposed"></i> in camera zone</span>
+      <span><i class="sw sw-avoid"></i> route</span>
+      <span><i class="sw sw-short"></i> shortest (comparison)</span>
+      <span><i class="sw sw-exposed"></i> in camera view</span>
       <span><i class="dot"></i> camera</span>
     </div>
 

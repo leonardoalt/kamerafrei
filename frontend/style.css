@@ -71,7 +71,7 @@ html, body {
 
 .slider-row label { font-size: 13px; white-space: nowrap; }
 .slider-row input { flex: 1; }
-#alpha-value { font-size: 13px; width: 34px; text-align: right; }
+#alpha-value { font-size: 13px; font-weight: 600; width: 52px; text-align: right; }
 
 #status {
   font-size: 13px;
@@ -98,6 +98,10 @@ html, body {
 #stats td:first-child { text-align: left; color: #555; }
 #stats .c-short { color: #6b7280; }
 #stats .c-avoid { color: #15803d; }
+
+/* avoidance off: only one route exists, hide the comparison column */
+#stats.single th:nth-child(3),
+#stats.single td:nth-child(3) { display: none; }
 
 .legend {
   display: flex;

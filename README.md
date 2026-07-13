@@ -30,10 +30,15 @@ make berlin
 make serve        # then open http://127.0.0.1:8000
 ```
 
-Click the map to set start (A) and destination (B), pick walk/bike, and move
-the *camera avoidance* slider: `α×` means one camera-covered meter costs as
-much as `1+α` open meters. The stats panel compares distance, time, cameras
-passed, and exposed meters against the shortest path.
+Click the map to set start (A) and destination (B), pick walk/bike, and set
+the *avoid cameras* slider (off / a little / a lot / max — how far out of
+your way you're willing to go to stay out of camera view). Route parts still
+inside camera view are drawn red; the stats panel compares distance, time,
+cameras passed, and exposed meters against the shortest path.
+
+Under the hood the slider sets α in the edge cost `length + α·exposure`
+(off/a little/a lot/max = 0/5/15/60): one camera-covered meter costs as much
+as 1+α open meters.
 
 ## Layout
 
@@ -57,6 +62,21 @@ GET /api/health
 `/api/route` returns the α=0 baseline and the avoiding route as GeoJSON, each
 with `distance_m`, `duration_min`, `n_cameras`, `exposed_m`, and
 `exposed_geometry` (the parts of the route inside camera zones).
+
+## Deploying
+
+The server is self-contained once `data/` exists (graphs + cameras, ~85 MB
+on disk, ~2.5 GB in RAM for both profiles). `data/` is not in git — build it
+on the server with `make venv berlin`, or build locally and `rsync data/` up.
+
+```sh
+docker compose up -d     # serves on :8000, mounts ./data read-only
+```
+
+Any VPS with ≥4 GB RAM works (e.g. the smallest Hetzner/Netcup tiers). Put a
+reverse proxy with TLS (Caddy, nginx) in front for public use. Map tiles are
+fetched by the visitor's browser straight from openstreetmap.org — fine at
+hobby scale under their tile policy; switch to a tile provider if it grows.
 
 ## Refreshing data
 

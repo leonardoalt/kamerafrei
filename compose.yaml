@@ -1,0 +1,10 @@
+services:
+  invisible:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
+    # walk + bike graphs for all of Berlin need ~2.5 GB resident
+    mem_limit: 4g

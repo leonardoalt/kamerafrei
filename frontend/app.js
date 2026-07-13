@@ -16,6 +16,26 @@ const statsEl = document.getElementById("stats");
 const alphaEl = document.getElementById("alpha");
 const alphaValueEl = document.getElementById("alpha-value");
 
+// slider stops: how far out of your way to go to stay out of camera view
+const AVOIDANCE = [
+  { alpha: 0, label: "off", color: "#6b7280" },
+  { alpha: 5, label: "a little", color: "#65a30d" },
+  { alpha: 15, label: "a lot", color: "#16a34a" },
+  { alpha: 60, label: "max", color: "#166534" },
+];
+
+function currentAvoidance() {
+  return AVOIDANCE[Number(alphaEl.value)];
+}
+
+function updateAlphaLabel() {
+  const level = currentAvoidance();
+  alphaValueEl.textContent = level.label;
+  alphaValueEl.style.color = level.color;
+  alphaEl.style.accentColor = level.color;
+}
+updateAlphaLabel();
+
 let markerA = null;
 let markerB = null;
 let requestSeq = 0;
@@ -97,7 +117,7 @@ document.getElementById("clear").addEventListener("click", () => {
 /* ---------------- controls ---------------- */
 
 alphaEl.addEventListener("input", () => {
-  alphaValueEl.textContent = `${alphaEl.value}×`;
+  updateAlphaLabel();
   debounceRoute();
 });
 
@@ -132,7 +152,7 @@ function requestRoute() {
     to_lat: b.lat.toFixed(6),
     to_lon: b.lng.toFixed(6),
     profile,
-    alpha: alphaEl.value,
+    alpha: currentAvoidance().alpha,
   });
 
   const seq = ++requestSeq;
@@ -160,37 +180,43 @@ function render(data) {
   const [baseline, avoiding] = data.routes;
   const shown = avoiding || baseline;
 
-  L.geoJSON(baseline.geometry, {
-    style: { color: "#6b7280", weight: 4, opacity: 0.7, dashArray: "6 8" },
-  }).addTo(routeLayer);
-
+  // gray comparison line only when there is something to compare against
   if (avoiding) {
-    L.geoJSON(avoiding.geometry, {
-      style: { color: "#16a34a", weight: 5, opacity: 0.9 },
+    L.geoJSON(baseline.geometry, {
+      style: { color: "#6b7280", weight: 4, opacity: 0.7, dashArray: "6 8" },
     }).addTo(routeLayer);
   }
 
-  // parts of the displayed route still inside camera zones
+  L.geoJSON(shown.geometry, {
+    style: { color: "#16a34a", weight: 5, opacity: 0.9 },
+  }).addTo(routeLayer);
+
+  // parts of the displayed route inside camera view
   if (shown.exposed_geometry && shown.exposed_geometry.coordinates.length) {
     L.geoJSON(shown.exposed_geometry, {
       style: { color: "#dc2626", weight: 6, opacity: 0.9 },
     }).addTo(routeLayer);
   }
 
-  fillStats(baseline, avoiding || baseline);
+  fillStats(baseline, shown);
+  statsEl.classList.toggle("single", !avoiding);
   statsEl.hidden = false;
 
-  if (avoiding && avoiding.same_as_baseline) {
+  if (!avoiding) {
+    setStatus(
+      baseline.n_cameras
+        ? `Shortest path — passes ${baseline.n_cameras} known cameras (red parts).`
+        : "Shortest path — passes no known cameras."
+    );
+  } else if (avoiding.same_as_baseline) {
     setStatus("Shortest path is already camera-minimal at this setting.");
-  } else if (avoiding) {
+  } else {
     const extra = avoiding.distance_m - baseline.distance_m;
     const saved = baseline.n_cameras - avoiding.n_cameras;
     setStatus(
       `+${fmtDist(extra)} detour avoids ${saved} of ${baseline.n_cameras} cameras ` +
       `(zone radius ${data.exposure_radius_m} m).`
     );
-  } else {
-    setStatus("Avoidance is 0 — showing the shortest path only.");
   }
 
   map.fitBounds(routeLayer.getBounds().pad(0.15));
