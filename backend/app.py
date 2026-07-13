@@ -95,4 +95,8 @@ def route(
     }
 
 
+# binary graphs for the in-browser router (produced by pipeline/export_web.py)
+if (DATA_DIR / "web").exists():
+    app.mount("/web-data", StaticFiles(directory=DATA_DIR / "web"), name="webdata")
+
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

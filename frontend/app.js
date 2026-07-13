@@ -46,6 +46,8 @@ const STR = {
     phDest: "Destination address …",
     searching: "Searching …",
     noResults: "No results in Berlin.",
+    offlineProgress: (pct) => `Offline routing: downloading ${pct}%`,
+    offlineReady: "Offline routing active — routes compute on this device.",
   },
   de: {
     subtitle:
@@ -87,6 +89,8 @@ const STR = {
     phDest: "Zieladresse …",
     searching: "Suche …",
     noResults: "Keine Treffer in Berlin.",
+    offlineProgress: (pct) => `Offline-Routing: lade ${pct} %`,
+    offlineReady: "Offline-Routing aktiv — Routen werden auf diesem Gerät berechnet.",
   },
 }[LANG];
 
@@ -104,7 +108,7 @@ document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
 
 // shareable view: #map=zoom/lat/lon, like openstreetmap.org
 function viewFromHash() {
-  const m = location.hash.match(/^#map=(\d+)\/(-?[\d.]+)\/(-?[\d.]+)$/);
+  const m = location.hash.match(/(?:^#|&)map=(\d+)\/(-?[\d.]+)\/(-?[\d.]+)/);
   return m ? { zoom: +m[1], center: [+m[2], +m[3]] } : null;
 }
 
@@ -388,6 +392,15 @@ function setupSearch(which) {
 setupSearch("a");
 setupSearch("b");
 
+// deep link: #r=latA,lonA,latB,lonB sets both markers and routes immediately
+const routeHash = location.hash.match(
+  /(?:^#|&)r=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/
+);
+if (routeHash) {
+  setPoint("a", L.latLng(+routeHash[1], +routeHash[2]));
+  setPoint("b", L.latLng(+routeHash[3], +routeHash[4]));
+}
+
 /* ---------------- controls ---------------- */
 
 alphaEl.addEventListener("input", () => {
@@ -404,6 +417,68 @@ function debounceRoute() {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(requestRoute, 250);
 }
+
+/* ---------------- client-side routing (enable with ?client=1) ------------ */
+
+const CLIENT_MODE =
+  new URLSearchParams(location.search).has("client") && typeof Worker !== "undefined";
+const localReady = { walk: false, bike: false };
+const pendingLocal = new Map(); // id -> {resolve, reject}
+let worker = null;
+let localMsgId = 0;
+
+function statusIsIdle() {
+  return !(markerA && markerB);
+}
+
+function initClientRouting(profile) {
+  if (!CLIENT_MODE || localReady[profile]) return;
+  if (!worker) {
+    worker = new Worker("worker.js?v=7", { type: "module" });
+    worker.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "progress" && m.total && statusIsIdle()) {
+        setStatus(STR.offlineProgress(Math.round((100 * m.loaded) / m.total)));
+      } else if (m.type === "ready") {
+        localReady[m.profile] = true;
+        if (statusIsIdle()) setStatus(STR.offlineReady);
+        else requestRoute(); // upgrade the visible route to the local engine
+      } else if (m.type === "result") {
+        pendingLocal.get(m.id)?.resolve(m.data);
+        pendingLocal.delete(m.id);
+      } else if (m.type === "routeError") {
+        pendingLocal.get(m.id)?.reject(new Error(m.message));
+        pendingLocal.delete(m.id);
+      } else if (m.type === "error") {
+        console.warn("routing worker:", m.message);
+      }
+    };
+    worker.onerror = (e) => console.warn("routing worker failed:", e.message);
+  }
+  worker.postMessage({
+    type: "init",
+    profile,
+    graphUrl: `/web-data/graph_${profile}.bin`,
+    camerasUrl: "/api/cameras",
+  });
+}
+
+function localRoute(profile, a, b, alpha) {
+  return new Promise((resolve, reject) => {
+    const id = ++localMsgId;
+    pendingLocal.set(id, { resolve, reject });
+    worker.postMessage({
+      type: "route",
+      id,
+      profile,
+      from: [a.lat, a.lng],
+      to: [b.lat, b.lng],
+      alpha,
+    });
+  });
+}
+
+initClientRouting("walk");
 
 /* ---------------- routing ---------------- */
 
@@ -432,11 +507,20 @@ function requestRoute() {
   const seq = ++requestSeq;
   setStatus(STR.routing);
 
-  fetch(`/api/route?${params}`)
-    .then(async (r) => {
+  const remote = () =>
+    fetch(`/api/route?${params}`).then(async (r) => {
       if (!r.ok) throw new Error((await r.json()).detail || `error ${r.status}`);
       return r.json();
-    })
+    });
+
+  initClientRouting(profile); // lazy-load the other profile's graph
+  const alpha = currentAvoidance().alpha;
+  const source =
+    CLIENT_MODE && localReady[profile]
+      ? localRoute(profile, a, b, alpha).catch(remote) // any local failure -> server
+      : remote();
+
+  source
     .then((data) => {
       if (seq !== requestSeq) return; // a newer request superseded this one
       render(data);
@@ -450,6 +534,7 @@ function requestRoute() {
 }
 
 function render(data) {
+  document.body.dataset.engine = data.engine || "server";
   routeLayer.clearLayers();
   const [baseline, avoiding] = data.routes;
   const shown = avoiding || baseline;
