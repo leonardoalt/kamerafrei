@@ -25,6 +25,10 @@ routers: dict[str, Router] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    try:  # so /web-data 404s (not 500s) before the exporter has run
+        (DATA_DIR / "web").mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass  # read-only mount in prod; the exporter creates it there
     for profile in ("walk", "bike"):
         graph_path = DATA_DIR / f"graph_{profile}.pkl.gz"
         if graph_path.exists() and CAMERAS_PATH.exists():
@@ -95,8 +99,13 @@ def route(
     }
 
 
-# binary graphs for the in-browser router (produced by pipeline/export_web.py)
-if (DATA_DIR / "web").exists():
-    app.mount("/web-data", StaticFiles(directory=DATA_DIR / "web"), name="webdata")
+# binary graphs for the in-browser router (produced by pipeline/export_web.py).
+# check_dir=False: serve 404s until the exporter creates the directory, then
+# serve files immediately — no restart-ordering dance.
+app.mount(
+    "/web-data",
+    StaticFiles(directory=DATA_DIR / "web", check_dir=False),
+    name="webdata",
+)
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
