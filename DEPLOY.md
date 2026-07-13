@@ -90,16 +90,24 @@ the usual cause.
 Both containers have `restart: unless-stopped`, so everything comes back by
 itself after a reboot (Docker itself is enabled via systemd in step 1).
 
-## 6. Cloudflare tuning (dashboard, once)
+## 6. Cloudflare tuning (optional — the site works fine without it)
 
-- **SSL/TLS**: enable *Always Use HTTPS*.
-- **Caching → Cache Rules**: hostname `kamerafrei.com` AND URI path is not
-  `/api/route` → *Eligible for cache*, edge TTL 1 hour. Static assets and
-  `/api/cameras` then serve from Cloudflare's edge, not your uplink.
-- **Security → WAF → Rate limiting** (1 rule is free): URI path equals
-  `/api/route`, more than 20 requests per 10 s per IP → block. Each route
-  costs ~130 ms CPU on a single worker; this keeps one abuser from queueing
-  everyone else.
+Heads-up: this lives in the **regular dashboard**, not Zero Trust. Go to
+**dash.cloudflare.com → click kamerafrei.com** in the domain list; all paths
+below are in that domain's left sidebar.
+
+- **Always HTTPS**: *SSL/TLS → Edge Certificates* → toggle **Always Use
+  HTTPS**.
+- **Cache rule** (static assets + `/api/cameras` served from Cloudflare's
+  edge instead of your uplink): *Caching → Cache Rules* → Create rule →
+  custom filter expression `not starts_with(http.request.uri.path,
+  "/api/route")` → **Eligible for cache**, Edge TTL: override, 1 hour →
+  Deploy.
+- **Rate limit** (each route costs ~130 ms CPU on a single worker; this
+  keeps one abuser from queueing everyone else): *Security → WAF → Rate
+  limiting rules* (newer layout: *Security → Security rules* → Create →
+  Rate limiting rule) → URI Path equals `/api/route`, 20 requests / 10 s
+  per IP → Block → Deploy. One rate-limiting rule is free.
 
 ## 7. Weekly camera refresh (cron)
 
