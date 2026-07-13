@@ -100,9 +100,18 @@ below are in that domain's left sidebar.
   HTTPS**.
 - **Cache rule** (static assets + `/api/cameras` served from Cloudflare's
   edge instead of your uplink): *Caching → Cache Rules* → Create rule →
-  custom filter expression `not starts_with(http.request.uri.path,
-  "/api/route")` → **Eligible for cache**, Edge TTL: override, 1 hour →
-  Deploy.
+  custom filter expression
+
+  ```
+  not starts_with(http.request.uri.path, "/api/route")
+  and http.request.uri.path ne "/"
+  and not ends_with(http.request.uri.path, ".html")
+  ```
+
+  → **Eligible for cache**, Edge TTL: override, 1 hour → Deploy.
+  Excluding the HTML matters: it references versioned assets (`?v=N`),
+  so keeping it uncached makes deploys visible immediately — everything
+  heavy stays cached.
 - **Rate limit** (each route costs ~130 ms CPU on a single worker; this
   keeps one abuser from queueing everyone else): *Security → WAF → Rate
   limiting rules* (newer layout: *Security → Security rules* → Create →
@@ -150,9 +159,10 @@ crontab -e
 cd ~/kamerafrei && git pull && docker compose --profile prod up -d --build
 ```
 
-If you created the cache rule (step 6), also purge the edge cache after a
-deploy — dashboard → kamerafrei.com → *Caching → Configuration → Purge
-Everything* — otherwise phones may see the old frontend for up to an hour.
+With the cache rule as written in step 6 (HTML excluded), deploys are
+visible immediately. If you used an older everything-but-`/api/route`
+variant of the rule, either update it or purge after each deploy:
+dashboard → kamerafrei.com → *Caching → Configuration → Purge Everything*.
 
 ## Notes
 
