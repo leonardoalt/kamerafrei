@@ -100,6 +100,11 @@ compute_exposure.py per-edge     routing.py Router (A*,
   re-downloading the street network.
 - `make serve` — uvicorn on 127.0.0.1:8000 (serves API + frontend together;
   no CORS needed).
+- `make export-web` — binary CSR graphs for the in-browser router
+  (docs/CLIENT_ROUTING.md; served at /web-data/). `make verify-client`
+  runs the parity harness: JS router costs must match the Python oracle.
+  Client routing is opt-in via `?client=1` until the PWA step lands;
+  local failures fall back to the server automatically.
 - Deploy (see DEPLOY.md): 4 GB VPS + `docker compose --profile prod up -d`
   (app + cloudflared tunnel; token in `.env`). Build data locally and rsync —
   the graph build peaks above 4 GB. `scripts/refresh_cameras.sh` is the
@@ -109,7 +114,9 @@ compute_exposure.py per-edge     routing.py Router (A*,
 
 ## Roadmap (not built yet)
 
-1. Client-side routing (static hosting, no server RAM).
+1. Client-side routing — exporter, JS A* worker, parity harness, and
+   ?client=1 integration are DONE; remaining: service worker cache, PWA
+   manifest, flip default on, then optional static hosting.
 2. View-cone exposure model + building shadowing (display cones exist;
    routing exposure still uses 25 m discs).
 3. Other cities (pipeline is city-agnostic — only place/bbox changes).
