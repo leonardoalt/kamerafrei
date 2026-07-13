@@ -123,7 +123,9 @@ docker compose run --rm pipeline sh -c "
   python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
 "
 ls -lh data/web                       # expect ~21 MB walk, ~10 MB bike
-docker compose --profile prod up -d   # restart: /web-data mounts at startup
+# --build so the app image includes the /web-data route; mounts at startup
+docker compose --profile prod up -d --build
+curl -sI http://127.0.0.1:8000/web-data/graph_walk.bin | head -1   # expect 200
 ```
 
 Check: `curl -sI https://kamerafrei.com/web-data/graph_walk.bin | head -1`
