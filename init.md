@@ -1,4 +1,4 @@
-# invisible
+# kamerafrei (originally: invisible)
 
 https://sunders.uber.space/?lat=52.5032461&lon=13.42391903&zoom=14#how
 

@@ -25,7 +25,7 @@ OVERPASS_URLS = [
     "https://overpass.private.coffee/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
 ]
-USER_AGENT = "invisible/0.1 (camera-avoiding route planner)"
+USER_AGENT = "kamerafrei/0.1 (camera-avoiding route planner)"
 
 BERLIN_QUERY = """
 [out:json][timeout:300];

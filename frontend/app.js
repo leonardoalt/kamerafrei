@@ -1,4 +1,4 @@
-/* invisible — camera-avoiding route planner (frontend) */
+/* kamerafrei — camera-avoiding route planner (frontend) */
 
 const map = L.map("map", { zoomControl: true }).setView([52.503, 13.424], 14);
 

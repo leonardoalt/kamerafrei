@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="invisible", lifespan=lifespan)
+app = FastAPI(title="kamerafrei", lifespan=lifespan)
 
 
 @app.get("/api/health")

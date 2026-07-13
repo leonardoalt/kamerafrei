@@ -1,4 +1,4 @@
-# invisible — MVP plan
+# kamerafrei — MVP plan
 
 A browser-based route planner for Berlin (walking/biking) that minimizes exposure to known surveillance cameras, using the same OSM data that [Surveillance under Surveillance](https://sunders.uber.space) visualizes.
 
