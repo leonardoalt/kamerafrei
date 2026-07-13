@@ -116,8 +116,9 @@ compute_exposure.py per-edge     routing.py Router (A*,
 4. OsmAnd/BRouter integration (no-go files from camera data).
 5. Weekly camera-refresh cron on the deployment.
 
-Done: address search (Nominatim, client-side, Berlin-bounded), direction
-cones on the map from camera:direction, shareable #map=zoom/lat/lon URLs.
+Done: address autocomplete (Photon by komoot — Nominatim forbids
+search-as-you-type; Berlin-bounded, device language), direction cones on
+the map from camera:direction, shareable #map=zoom/lat/lon URLs.
 
 ## Known limitations (communicate honestly in UI/docs)
 

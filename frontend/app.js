@@ -29,7 +29,7 @@ const STR = {
       "contributors (<code>man_made=surveillance</code>), as visualized by " +
       '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
       "Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only. " +
-      'Address search by <a href="https://nominatim.org">Nominatim</a>.',
+      'Address search by <a href="https://photon.komoot.io">Photon</a>.',
     loading: "Loading cameras …",
     setStart: "Tap the map to set start.",
     camsLoaded: (n) => `${n} known cameras loaded. Tap the map to set start.`,
@@ -70,7 +70,7 @@ const STR = {
       "Mitwirkende (<code>man_made=surveillance</code>), visualisiert von " +
       '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
       "Die Abdeckung ist <strong>unvollständig</strong>: Es werden nur <em>bekannte</em> Kameras gemieden. " +
-      'Adresssuche via <a href="https://nominatim.org">Nominatim</a>.',
+      'Adresssuche via <a href="https://photon.komoot.io">Photon</a>.',
     loading: "Lade Kameras …",
     setStart: "Tippe auf die Karte für den Start.",
     camsLoaded: (n) => `${n} bekannte Kameras geladen. Tippe auf die Karte für den Start.`,
@@ -299,52 +299,86 @@ document.getElementById("clear").addEventListener("click", () => {
   setStatus(STR.setStart);
 });
 
-/* ---------------- address search (Nominatim) ----------------------------- */
+/* ---------------- address autocomplete (Photon by komoot) ---------------- */
+/* Photon is built for search-as-you-type; Nominatim's policy forbids it. */
 
-const BERLIN_VIEWBOX = "13.088,52.675,13.761,52.338";
+const BERLIN_BBOX = "13.088,52.338,13.761,52.675"; // minLon,minLat,maxLon,maxLat
+
+function photonLabel(p) {
+  const main = p.name || [p.street, p.housenumber].filter(Boolean).join(" ");
+  const street =
+    p.name && p.street ? [p.street, p.housenumber].filter(Boolean).join(" ") : null;
+  const place = [p.postcode, p.district || p.city].filter(Boolean).join(" ");
+  return [main, street, place].filter(Boolean).join(", ");
+}
 
 function setupSearch(which) {
   const input = document.getElementById(`search-${which}`);
   const box = document.getElementById(`search-${which}-results`);
+  let timer = null;
+  let seq = 0;
+  let first = null; // top hit, picked on Enter
 
   const hint = (text) => {
     box.innerHTML = `<li class="hint">${text}</li>`;
     box.hidden = false;
   };
 
-  input.addEventListener("keydown", async (e) => {
-    if (e.key !== "Enter") return;
+  const pick = (hit) => {
+    box.hidden = true;
+    input.value = photonLabel(hit.properties);
+    input.blur();
+    const [lng, lat] = hit.geometry.coordinates;
+    const latlng = L.latLng(lat, lng);
+    map.setView(latlng, Math.max(map.getZoom(), 15));
+    setPoint(which, latlng);
+  };
+
+  const search = async () => {
     const q = input.value.trim();
-    if (!q) return;
-    hint(STR.searching);
+    if (q.length < 3) {
+      box.hidden = true;
+      first = null;
+      return;
+    }
+    const mySeq = ++seq;
     try {
       const params = new URLSearchParams({
-        format: "jsonv2",
-        limit: "5",
-        "accept-language": LANG,
-        viewbox: BERLIN_VIEWBOX,
-        bounded: "1",
         q,
+        limit: "5",
+        lang: LANG,
+        bbox: BERLIN_BBOX,
       });
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
-      const hits = await r.json();
+      const r = await fetch(`https://photon.komoot.io/api/?${params}`);
+      const hits = (await r.json()).features || [];
+      if (mySeq !== seq) return; // superseded by newer keystrokes
+      first = hits[0] || null;
       if (!hits.length) return hint(STR.noResults);
       box.innerHTML = "";
       for (const h of hits) {
         const li = document.createElement("li");
-        li.textContent = h.display_name;
-        li.addEventListener("click", () => {
-          box.hidden = true;
-          input.value = h.display_name;
-          const latlng = L.latLng(+h.lat, +h.lon);
-          map.setView(latlng, Math.max(map.getZoom(), 15));
-          setPoint(which, latlng);
-        });
+        li.textContent = photonLabel(h.properties);
+        li.addEventListener("click", () => pick(h));
         box.appendChild(li);
       }
       box.hidden = false;
     } catch {
-      hint(STR.noResults);
+      if (mySeq === seq) hint(STR.noResults);
+    }
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(search, 300);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      clearTimeout(timer);
+      if (first) pick(first);
+      else search();
+    } else if (e.key === "Escape") {
+      box.hidden = true;
     }
   });
 
