@@ -34,7 +34,11 @@ async def lifespan(app: FastAPI):
                 f"{routers[profile].cameras.n_cameras} cameras"
             )
     if not routers:
-        print("WARNING: no graphs found in data/ — run the pipeline first (see README)")
+        print(
+            f"WARNING: no graphs loaded — looked for graph_walk/bike.pkl.gz and "
+            f"cameras.geojson in {DATA_DIR}. Add them and RESTART the server; "
+            f"data is only read at startup."
+        )
     yield
 
 
@@ -65,7 +69,10 @@ def route(
     router = routers.get(profile)
     if router is None:
         raise HTTPException(
-            503, f"profile {profile!r} not available — build data/graph_{profile}.pkl.gz"
+            503,
+            f"profile {profile!r} not available — data/graph_{profile}.pkl.gz and "
+            f"cameras.geojson must exist when the server starts. If you added them "
+            f"just now, restart it (docker compose restart kamerafrei).",
         )
     origin, destination = (from_lat, from_lon), (to_lat, to_lon)
     try:
