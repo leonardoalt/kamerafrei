@@ -30,15 +30,21 @@ cd ~/kamerafrei
 
 ## 3. Get the data
 
-The graphs were already built on the dev machine (`make venv berlin`
-rebuilds them if ever needed — needs ~6 GB RAM at peak). Copy them over;
-`data/` should end up containing `graph_walk.pkl.gz`, `graph_bike.pkl.gz`,
-and `cameras.geojson` (~85 MB total):
+Prebuilt graphs + cameras are published as a GitHub release (~85 MB total):
 
 ```sh
-# adjust host/user to reach the dev machine:
-rsync -av --exclude cache <dev-machine>:devel/invisible/data/ ~/kamerafrei/data/
+mkdir -p ~/kamerafrei/data && cd ~/kamerafrei/data
+base=https://github.com/leonardoalt/kamerafrei/releases/latest/download
+curl -LO $base/graph_walk.pkl.gz
+curl -LO $base/graph_bike.pkl.gz
+curl -LO $base/cameras.geojson
+cd ~/kamerafrei
 ```
+
+(To rebuild from scratch instead: `make venv berlin` on a machine with
+~6 GB free RAM, then copy `data/` over. To publish a fresh release from the
+dev machine: `gh release create data-YYYY-MM-DD data/graph_*.pkl.gz
+data/cameras.geojson --title "Berlin data YYYY-MM-DD"`.)
 
 ## 4. Create the Cloudflare Tunnel (dashboard, once)
 
