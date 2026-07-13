@@ -53,13 +53,19 @@ At [one.dash.cloudflare.com](https://one.dash.cloudflare.com):
 1. **Networks → Tunnels → Create a tunnel** → connector type *Cloudflared*
    → name it `kamerafrei` → **copy the token** (the long string after
    `--token` in the install command it displays — you need only the token,
-   not the command).
-2. In the tunnel's **Public hostname** tab add two entries:
-   - `kamerafrei.com` → service `http://kamerafrei:8000`
-   - `www.kamerafrei.com` → service `http://kamerafrei:8000`
+   not the command; the compose file runs the connector for you).
+2. On the tunnel page, in **Routes** → **Add route** → **Published
+   application**, add two routes:
+   - subdomain *(empty)*, domain `kamerafrei.com`, service `HTTP`,
+     URL `kamerafrei:8000`
+   - subdomain `www`, domain `kamerafrei.com`, service `HTTP`,
+     URL `kamerafrei:8000`
 
    (`kamerafrei` is the Docker service name; cloudflared resolves it on the
    compose network. DNS records are created automatically.)
+3. The tunnel shows **Down** and "Install cloudflared connector" until the
+   compose stack connects in the next step — that's expected. Replicas stay
+   at 1; you never need to add more.
 
 ## 5. Run it
 
