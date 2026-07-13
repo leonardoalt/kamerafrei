@@ -99,7 +99,8 @@ if (window.matchMedia("(max-width: 640px)").matches) {
   panel.classList.add("collapsed");
   panelToggle.setAttribute("aria-expanded", "false");
 }
-panelToggle.addEventListener("click", () => {
+// the whole header row (title included) toggles, not just the chevron
+document.getElementById("panel-header").addEventListener("click", () => {
   const collapsed = panel.classList.toggle("collapsed");
   panelToggle.setAttribute("aria-expanded", String(!collapsed));
 });
