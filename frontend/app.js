@@ -48,6 +48,8 @@ const STR = {
     noResults: "No results in Berlin.",
     offlineProgress: (pct) => `Offline routing: downloading ${pct}%`,
     offlineReady: "Offline routing active — routes compute on this device.",
+    engineLocal: (ms) => `⚡ computed on this device in ${ms} ms`,
+    engineServer: (ms) => `computed on the server in ${ms} ms`,
   },
   de: {
     subtitle:
@@ -91,6 +93,8 @@ const STR = {
     noResults: "Keine Treffer in Berlin.",
     offlineProgress: (pct) => `Offline-Routing: lade ${pct} %`,
     offlineReady: "Offline-Routing aktiv — Routen werden auf diesem Gerät berechnet.",
+    engineLocal: (ms) => `⚡ auf diesem Gerät berechnet (${ms} ms)`,
+    engineServer: (ms) => `auf dem Server berechnet (${ms} ms)`,
   },
 }[LANG];
 
@@ -526,6 +530,14 @@ function requestRoute() {
 
 function render(data) {
   document.body.dataset.engine = data.engine || "server";
+  const engineNote = document.getElementById("engine-note");
+  if (data.took_ms != null) {
+    engineNote.textContent =
+      data.engine === "client"
+        ? STR.engineLocal(data.took_ms)
+        : STR.engineServer(data.took_ms);
+    engineNote.hidden = false;
+  }
   routeLayer.clearLayers();
   const [baseline, avoiding] = data.routes;
   const shown = avoiding || baseline;

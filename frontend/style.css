@@ -165,6 +165,12 @@ html, body {
 #stats.single th:nth-child(3),
 #stats.single td:nth-child(3) { display: none; }
 
+#engine-note {
+  font-size: 11px;
+  color: #888;
+  margin: -4px 0 8px;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
