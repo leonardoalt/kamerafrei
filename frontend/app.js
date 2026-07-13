@@ -1,0 +1,208 @@
+/* invisible — camera-avoiding route planner (frontend) */
+
+const map = L.map("map", { zoomControl: true }).setView([52.503, 13.424], 14);
+
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+}).addTo(map);
+
+const canvas = L.canvas({ padding: 0.3 });
+const cameraLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+
+const statusEl = document.getElementById("status");
+const statsEl = document.getElementById("stats");
+const alphaEl = document.getElementById("alpha");
+const alphaValueEl = document.getElementById("alpha-value");
+
+let markerA = null;
+let markerB = null;
+let requestSeq = 0;
+
+function setStatus(text, isError = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle("error", isError);
+}
+
+/* ---------------- cameras ---------------- */
+
+function cameraPopup(props) {
+  const skip = new Set(["osm_id"]);
+  const rows = Object.entries(props)
+    .filter(([k]) => !skip.has(k))
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+    .join("");
+  const [type, id] = (props.osm_id || "/").split("/");
+  return `<b>camera</b> <a href="https://www.openstreetmap.org/${type}/${id}" target="_blank">${props.osm_id}</a>
+          <table class="cam-tags">${rows}</table>`;
+}
+
+fetch("/api/cameras")
+  .then((r) => {
+    if (!r.ok) throw new Error("no camera data on server");
+    return r.json();
+  })
+  .then((geojson) => {
+    L.geoJSON(geojson, {
+      pointToLayer: (feat, latlng) =>
+        L.circleMarker(latlng, {
+          renderer: canvas,
+          radius: 3.5,
+          color: "#7f1d1d",
+          weight: 1,
+          fillColor: "#dc2626",
+          fillOpacity: 0.6,
+        }).bindPopup(cameraPopup(feat.properties)),
+    }).addTo(cameraLayer);
+    setStatus(`${geojson.features.length} known cameras loaded. Click to set start.`);
+  })
+  .catch((err) => setStatus(err.message, true));
+
+/* ---------------- markers ---------------- */
+
+function pinIcon(label, cls) {
+  return L.divIcon({
+    className: "",
+    html: `<div class="marker-pin ${cls}"><span>${label}</span></div>`,
+    iconSize: [26, 26],
+    iconAnchor: [4, 24],
+  });
+}
+
+map.on("click", (e) => {
+  if (!markerA) {
+    markerA = L.marker(e.latlng, { draggable: true, icon: pinIcon("A", "marker-a") }).addTo(map);
+    markerA.on("dragend", requestRoute);
+    setStatus("Now click the destination.");
+  } else if (!markerB) {
+    markerB = L.marker(e.latlng, { draggable: true, icon: pinIcon("B", "marker-b") }).addTo(map);
+    markerB.on("dragend", requestRoute);
+    requestRoute();
+  } else {
+    markerB.setLatLng(e.latlng);
+    requestRoute();
+  }
+});
+
+document.getElementById("clear").addEventListener("click", () => {
+  if (markerA) map.removeLayer(markerA);
+  if (markerB) map.removeLayer(markerB);
+  markerA = markerB = null;
+  routeLayer.clearLayers();
+  statsEl.hidden = true;
+  setStatus("Click the map to set start.");
+});
+
+/* ---------------- controls ---------------- */
+
+alphaEl.addEventListener("input", () => {
+  alphaValueEl.textContent = `${alphaEl.value}×`;
+  debounceRoute();
+});
+
+document.querySelectorAll('input[name="profile"]').forEach((el) =>
+  el.addEventListener("change", requestRoute)
+);
+
+let debounceTimer = null;
+function debounceRoute() {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(requestRoute, 250);
+}
+
+/* ---------------- routing ---------------- */
+
+function fmtDist(m) {
+  return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
+}
+
+function fmtTime(min) {
+  return min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`;
+}
+
+function requestRoute() {
+  if (!markerA || !markerB) return;
+  const a = markerA.getLatLng();
+  const b = markerB.getLatLng();
+  const profile = document.querySelector('input[name="profile"]:checked').value;
+  const params = new URLSearchParams({
+    from_lat: a.lat.toFixed(6),
+    from_lon: a.lng.toFixed(6),
+    to_lat: b.lat.toFixed(6),
+    to_lon: b.lng.toFixed(6),
+    profile,
+    alpha: alphaEl.value,
+  });
+
+  const seq = ++requestSeq;
+  setStatus("Routing …");
+
+  fetch(`/api/route?${params}`)
+    .then(async (r) => {
+      if (!r.ok) throw new Error((await r.json()).detail || `error ${r.status}`);
+      return r.json();
+    })
+    .then((data) => {
+      if (seq !== requestSeq) return; // a newer request superseded this one
+      render(data);
+    })
+    .catch((err) => {
+      if (seq !== requestSeq) return;
+      setStatus(err.message, true);
+      routeLayer.clearLayers();
+      statsEl.hidden = true;
+    });
+}
+
+function render(data) {
+  routeLayer.clearLayers();
+  const [baseline, avoiding] = data.routes;
+  const shown = avoiding || baseline;
+
+  L.geoJSON(baseline.geometry, {
+    style: { color: "#6b7280", weight: 4, opacity: 0.7, dashArray: "6 8" },
+  }).addTo(routeLayer);
+
+  if (avoiding) {
+    L.geoJSON(avoiding.geometry, {
+      style: { color: "#16a34a", weight: 5, opacity: 0.9 },
+    }).addTo(routeLayer);
+  }
+
+  // parts of the displayed route still inside camera zones
+  if (shown.exposed_geometry && shown.exposed_geometry.coordinates.length) {
+    L.geoJSON(shown.exposed_geometry, {
+      style: { color: "#dc2626", weight: 6, opacity: 0.9 },
+    }).addTo(routeLayer);
+  }
+
+  fillStats(baseline, avoiding || baseline);
+  statsEl.hidden = false;
+
+  if (avoiding && avoiding.same_as_baseline) {
+    setStatus("Shortest path is already camera-minimal at this setting.");
+  } else if (avoiding) {
+    const extra = avoiding.distance_m - baseline.distance_m;
+    const saved = baseline.n_cameras - avoiding.n_cameras;
+    setStatus(
+      `+${fmtDist(extra)} detour avoids ${saved} of ${baseline.n_cameras} cameras ` +
+      `(zone radius ${data.exposure_radius_m} m).`
+    );
+  } else {
+    setStatus("Avoidance is 0 — showing the shortest path only.");
+  }
+
+  map.fitBounds(routeLayer.getBounds().pad(0.15));
+}
+
+function fillStats(s, a) {
+  document.getElementById("s-dist").textContent = fmtDist(s.distance_m);
+  document.getElementById("a-dist").textContent = fmtDist(a.distance_m);
+  document.getElementById("s-time").textContent = fmtTime(s.duration_min);
+  document.getElementById("a-time").textContent = fmtTime(a.duration_min);
+  document.getElementById("s-cams").textContent = s.n_cameras;
+  document.getElementById("a-cams").textContent = a.n_cameras;
+  document.getElementById("s-exp").textContent = fmtDist(s.exposed_m);
+  document.getElementById("a-exp").textContent = fmtDist(a.exposed_m);
+}

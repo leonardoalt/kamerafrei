@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>invisible — camera-avoiding routes for Berlin</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="panel">
+    <h1>invisible</h1>
+    <p class="subtitle">Routes that avoid known surveillance cameras.<br />
+      Click the map to set start and destination.</p>
+
+    <div class="row">
+      <label class="seg">
+        <input type="radio" name="profile" value="walk" checked /> <span>🚶 walk</span>
+      </label>
+      <label class="seg">
+        <input type="radio" name="profile" value="bike" /> <span>🚲 bike</span>
+      </label>
+      <button id="clear" title="Clear route">✕ clear</button>
+    </div>
+
+    <div class="row slider-row">
+      <label for="alpha">camera avoidance</label>
+      <input type="range" id="alpha" min="0" max="60" step="5" value="15" />
+      <span id="alpha-value">15×</span>
+    </div>
+
+    <div id="status">Loading cameras …</div>
+
+    <table id="stats" hidden>
+      <thead>
+        <tr><th></th><th class="c-short">shortest</th><th class="c-avoid">low-camera</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>distance</td><td id="s-dist"></td><td id="a-dist"></td></tr>
+        <tr><td>time</td><td id="s-time"></td><td id="a-time"></td></tr>
+        <tr><td>cameras passed</td><td id="s-cams"></td><td id="a-cams"></td></tr>
+        <tr><td>exposed</td><td id="s-exp"></td><td id="a-exp"></td></tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <span><i class="sw sw-short"></i> shortest</span>
+      <span><i class="sw sw-avoid"></i> low-camera</span>
+      <span><i class="sw sw-exposed"></i> in camera zone</span>
+      <span><i class="dot"></i> camera</span>
+    </div>
+
+    <p class="disclaimer">
+      Camera data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
+      contributors (<code>man_made=surveillance</code>), as visualized by
+      <a href="https://sunders.uber.space">Surveillance under Surveillance</a>.
+      Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only.
+    </p>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>
