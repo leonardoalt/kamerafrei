@@ -109,6 +109,25 @@ below are in that domain's left sidebar.
   Rate limiting rule) → URI Path equals `/api/route`, 20 requests / 10 s
   per IP → Block → Deploy. One rate-limiting rule is free.
 
+## 6b. One-time: binary graphs for in-browser routing
+
+Fresh pipeline runs (`make berlin`, the weekly refresh) produce
+`data/web/*.bin` automatically, but if your `data/` predates that step,
+generate them once:
+
+```sh
+cd ~/kamerafrei
+docker compose run --rm pipeline sh -c "
+  python pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin &&
+  python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+"
+docker compose --profile prod up -d   # restart: /web-data mounts at startup
+```
+
+Check: `curl -sI https://kamerafrei.com/web-data/graph_walk.bin | head -1`
+→ 200. Without these files the site still works — `?client=1` just falls
+back to server routing.
+
 ## 7. Weekly camera refresh (cron)
 
 New cameras appear in OSM continuously. This re-fetches them and recomputes
