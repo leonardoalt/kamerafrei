@@ -6,8 +6,10 @@ services:
     volumes:
       - ./data:/app/data:ro
     restart: unless-stopped
-    # walk + bike graphs for all of Berlin need ~2.5 GB resident
-    mem_limit: 3g
+    # Graphs hold ~2.5 GB resident and each query allocates a few hundred MB
+    # more — a tight cap makes the container thrash on every route. Give it
+    # real headroom (host needs >= 8 GB free).
+    mem_limit: 8g
 
   # production only: outbound tunnel to Cloudflare, no open ports needed
   # (docker compose --profile prod up -d). Token comes from .env — see DEPLOY.md

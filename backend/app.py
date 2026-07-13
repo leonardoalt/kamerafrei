@@ -5,6 +5,7 @@ Data: expects data/graph_{walk,bike}.pkl.gz (from the pipeline) and
       data/cameras.geojson. Profiles whose graph is missing return 503.
 """
 
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -75,6 +76,7 @@ def route(
             f"just now, restart it (docker compose restart kamerafrei).",
         )
     origin, destination = (from_lat, from_lon), (to_lat, to_lon)
+    t0 = time.perf_counter()
     try:
         baseline = router.route(origin, destination, alpha=0.0)
         results = [baseline]
@@ -86,7 +88,11 @@ def route(
         raise HTTPException(400, str(exc))
     for r in results:
         r.pop("node_path", None)
-    return {"routes": results, "exposure_radius_m": router.radius}
+    return {
+        "routes": results,
+        "exposure_radius_m": router.radius,
+        "took_ms": round((time.perf_counter() - t0) * 1000, 1),
+    }
 
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

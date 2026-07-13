@@ -127,6 +127,10 @@ crontab -e
 cd ~/kamerafrei && git pull && docker compose --profile prod up -d --build
 ```
 
+If you created the cache rule (step 6), also purge the edge cache after a
+deploy — dashboard → kamerafrei.com → *Caching → Configuration → Purge
+Everything* — otherwise phones may see the old frontend for up to an hour.
+
 ## Notes
 
 - The app binds to `127.0.0.1:8000` on the host — reachable from the LAN
