@@ -1,99 +1,131 @@
 # Deploying kamerafrei.com
 
-Target setup: a small VPS running the app via Docker, published through a
-Cloudflare Tunnel (domain is on Cloudflare Registrar). No open inbound ports,
-no TLS certificates to manage, origin IP stays hidden.
+Primary setup: a **home server** running the app via Docker, published
+through a **Cloudflare Tunnel** (domain is on Cloudflare Registrar).
+`cloudflared` dials *out* to Cloudflare, so this needs **no port
+forwarding, no static IP, no open inbound ports**, and works behind CGNAT.
+Your home IP is never exposed. A rented VPS works identically — see the
+variant at the end.
 
-Cost: ~€4/month VPS + the domain.
+Requirements: ~3 GB free RAM, ~100 MB disk for data, Linux with Docker.
 
-## 1. Provision the server
-
-- Hetzner Cloud **CAX11** (ARM64, 4 GB RAM) or CX22 (x86), Ubuntu 24.04,
-  Falkenstein or Nuremberg. Any 4 GB VPS elsewhere works the same.
-- Add your SSH key when creating it.
-
-```sh
-ssh root@<server-ip>
-apt update && apt install -y docker.io docker-compose-v2 git rsync
-```
-
-## 2. Install the app
+## 1. Install Docker (once)
 
 ```sh
-git clone https://github.com/leonardoalt/kamerafrei /opt/kamerafrei
-cd /opt/kamerafrei
+# Debian/Ubuntu:
+sudo apt update && sudo apt install -y docker.io docker-compose-v2 git rsync
+# Arch:
+sudo pacman -S --needed docker docker-compose git rsync
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER   # then re-login (or prefix docker cmds with sudo)
 ```
 
-## 3. Upload the data
-
-Build the graphs on your own machine (`make venv berlin` — do NOT build on
-the server, the build peaks above 4 GB), then from your machine:
+## 2. Get the app
 
 ```sh
-rsync -av --exclude cache ~/devel/invisible/data/ root@<server-ip>:/opt/kamerafrei/data/
+git clone https://github.com/leonardoalt/kamerafrei ~/kamerafrei
+cd ~/kamerafrei
 ```
 
-~85 MB: two graph pickles + cameras.geojson.
+## 3. Get the data
 
-## 4. Create the Cloudflare Tunnel
+The graphs were already built on the dev machine (`make venv berlin`
+rebuilds them if ever needed — needs ~6 GB RAM at peak). Copy them over;
+`data/` should end up containing `graph_walk.pkl.gz`, `graph_bike.pkl.gz`,
+and `cameras.geojson` (~85 MB total):
 
-In the Cloudflare dashboard ([one.dash.cloudflare.com](https://one.dash.cloudflare.com)):
+```sh
+# adjust host/user to reach the dev machine:
+rsync -av --exclude cache <dev-machine>:devel/invisible/data/ ~/kamerafrei/data/
+```
 
-1. **Networks → Tunnels → Create a tunnel** → type *Cloudflared* → name it
-   `kamerafrei`.
-2. Copy the token from the install command it shows (the long string after
-   `--token`).
-3. **Public hostname** tab — add:
+## 4. Create the Cloudflare Tunnel (dashboard, once)
+
+At [one.dash.cloudflare.com](https://one.dash.cloudflare.com):
+
+1. **Networks → Tunnels → Create a tunnel** → connector type *Cloudflared*
+   → name it `kamerafrei` → **copy the token** (the long string after
+   `--token` in the install command it displays — you need only the token,
+   not the command).
+2. In the tunnel's **Public hostname** tab add two entries:
    - `kamerafrei.com` → service `http://kamerafrei:8000`
    - `www.kamerafrei.com` → service `http://kamerafrei:8000`
-   (`kamerafrei` is the compose service name; cloudflared resolves it on the
-   Docker network. The DNS records are created automatically.)
 
-On the server:
+   (`kamerafrei` is the Docker service name; cloudflared resolves it on the
+   compose network. DNS records are created automatically.)
+
+## 5. Run it
 
 ```sh
-cd /opt/kamerafrei
-cp .env.example .env        # then paste the token into .env
+cd ~/kamerafrei
+cp .env.example .env
+"${EDITOR:-nano}" .env          # paste the tunnel token
 docker compose --profile prod up -d --build
 ```
 
-Check: `curl -s https://kamerafrei.com/api/health` →
-`{"profiles":["bike","walk"],"cameras":true}`.
+Verify:
 
-## 5. Cloudflare tuning (dashboard, once)
+```sh
+curl -s http://127.0.0.1:8000/api/health   # local
+curl -s https://kamerafrei.com/api/health  # through the tunnel
+# expect: {"profiles":["bike","walk"],"cameras":true}
+```
 
-- **SSL/TLS**: mode *Full*; enable *Always Use HTTPS*.
-- **Cache rule** (Caching → Cache Rules): hostname `kamerafrei.com` AND URI
-  path is not `/api/route` → *Eligible for cache*, edge TTL 1 hour. Static
-  assets and `/api/cameras` then serve from the edge; routes stay dynamic.
-- **Rate limiting rule** (Security → WAF → Rate limiting, 1 free rule): URI
-  path equals `/api/route`, more than 20 requests per 10 seconds per IP →
-  block. Each route costs ~130 ms of CPU on a single worker — this keeps one
-  abuser from queueing everyone else.
+If the second one fails, `docker compose logs cloudflared` — a bad token is
+the usual cause.
 
-## 6. Weekly camera refresh
+Both containers have `restart: unless-stopped`, so everything comes back by
+itself after a reboot (Docker itself is enabled via systemd in step 1).
 
-New cameras appear in OSM continuously; refresh without re-downloading the
-street network:
+## 6. Cloudflare tuning (dashboard, once)
+
+- **SSL/TLS**: enable *Always Use HTTPS*.
+- **Caching → Cache Rules**: hostname `kamerafrei.com` AND URI path is not
+  `/api/route` → *Eligible for cache*, edge TTL 1 hour. Static assets and
+  `/api/cameras` then serve from Cloudflare's edge, not your uplink.
+- **Security → WAF → Rate limiting** (1 rule is free): URI path equals
+  `/api/route`, more than 20 requests per 10 s per IP → block. Each route
+  costs ~130 ms CPU on a single worker; this keeps one abuser from queueing
+  everyone else.
+
+## 7. Weekly camera refresh (cron)
+
+New cameras appear in OSM continuously. This re-fetches them and recomputes
+exposure on the existing graphs (no street-network re-download, ~2–3 min of
+downtime):
 
 ```sh
 crontab -e
-# Mondays 04:00 UTC, ~2-3 min downtime while exposure recomputes
-0 4 * * 1 /opt/kamerafrei/scripts/refresh_cameras.sh >> /var/log/kamerafrei-refresh.log 2>&1
+# Mondays 04:00
+0 4 * * 1 ~/kamerafrei/scripts/refresh_cameras.sh >> ~/kamerafrei/refresh.log 2>&1
 ```
 
-## 7. Updating the app
+## 8. Updating the app
 
 ```sh
-cd /opt/kamerafrei && git pull && docker compose --profile prod up -d --build
+cd ~/kamerafrei && git pull && docker compose --profile prod up -d --build
 ```
 
 ## Notes
 
-- The app container binds only to 127.0.0.1 on the host; the tunnel is the
-  sole public path. No firewall rules needed beyond the default.
-- Single uvicorn worker by design — each worker would duplicate the 2.5 GB
-  graph. If traffic ever outgrows this, the roadmap's client-side routing
+- The app binds to `127.0.0.1:8000` on the host — reachable from the LAN
+  box itself and through the tunnel, nothing else. No firewall changes.
+- Bandwidth is a non-issue: route responses are a few KB and map tiles go
+  from openstreetmap.org to the visitor directly, never through your line.
+- Home hosting trade-off: the site's uptime is the machine's uptime. An
+  uptime monitor (e.g. UptimeRobot on `https://kamerafrei.com/api/health`)
+  tells you when it matters.
+- Single uvicorn worker by design — each worker would duplicate ~2.5 GB of
+  graphs. If traffic outgrows this, the roadmap's client-side routing
   removes the server entirely.
-- Optional: point an uptime monitor (e.g. UptimeRobot) at
-  `https://kamerafrei.com/api/health`.
+
+## Variant: rented VPS instead of home server
+
+Identical setup; only the machine differs:
+
+1. Provision a ≥4 GB RAM VPS (e.g. Hetzner CAX11, ~€4/mo), Ubuntu 24.04.
+2. Follow steps 1–8 above on it. **Don't build graphs on a 4 GB box** — the
+   build peaks above that; copy `data/` from a bigger machine (step 3).
+3. Migration home↔VPS later is trivial: same compose file, same tunnel —
+   move `data/` and the `.env` token, `docker compose --profile prod up -d`.
