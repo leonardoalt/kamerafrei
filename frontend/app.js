@@ -1,5 +1,94 @@
 /* kamerafrei — camera-avoiding route planner (frontend) */
 
+/* ---------------- i18n: device language, en/de, en default -------------- */
+
+const LANG = (navigator.language || "en").toLowerCase().startsWith("de") ? "de" : "en";
+document.documentElement.lang = LANG;
+
+const STR = {
+  en: {
+    subtitle:
+      "Routes that avoid known surveillance cameras.<br />Tap the map to set start and destination.",
+    walk: "🚶 walk",
+    bike: "🚲 bike",
+    clear: "✕ clear",
+    avoid: "avoid cameras",
+    levels: ["off", "a little", "a lot", "max"],
+    thShort: "shortest",
+    thAvoid: "low-camera",
+    rowDist: "distance",
+    rowTime: "time",
+    rowCams: "cameras passed",
+    rowExp: "exposed",
+    legRoute: "route",
+    legShort: "shortest (comparison)",
+    legExposed: "in camera view",
+    legCam: "camera",
+    disclaimer:
+      'Camera data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
+      "contributors (<code>man_made=surveillance</code>), as visualized by " +
+      '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
+      "Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only.",
+    loading: "Loading cameras …",
+    setStart: "Tap the map to set start.",
+    camsLoaded: (n) => `${n} known cameras loaded. Tap the map to set start.`,
+    setDest: "Now tap the destination.",
+    routing: "Routing …",
+    alreadyMinimal: "Shortest path is already camera-minimal at this setting.",
+    detour: (extra, saved, total, radius) =>
+      `+${extra} detour avoids ${saved} of ${total} cameras (zone radius ${radius} m).`,
+    offCams: (n) => `Shortest path — passes ${n} known cameras (red parts).`,
+    offNone: "Shortest path — passes no known cameras.",
+    popupCamera: "camera",
+    noCamData: "no camera data on the server",
+  },
+  de: {
+    subtitle:
+      "Routen, die bekannten Überwachungskameras ausweichen.<br />Tippe auf die Karte für Start und Ziel.",
+    walk: "🚶 zu Fuß",
+    bike: "🚲 Rad",
+    clear: "✕ löschen",
+    avoid: "Kameras meiden",
+    levels: ["aus", "etwas", "stark", "max"],
+    thShort: "kürzeste",
+    thAvoid: "kameraarm",
+    rowDist: "Distanz",
+    rowTime: "Zeit",
+    rowCams: "Kameras",
+    rowExp: "exponiert",
+    legRoute: "Route",
+    legShort: "kürzeste (Vergleich)",
+    legExposed: "im Kamerablick",
+    legCam: "Kamera",
+    disclaimer:
+      'Kameradaten © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-' +
+      "Mitwirkende (<code>man_made=surveillance</code>), visualisiert von " +
+      '<a href="https://sunders.uber.space">Surveillance under Surveillance</a>. ' +
+      "Die Abdeckung ist <strong>unvollständig</strong>: Es werden nur <em>bekannte</em> Kameras gemieden.",
+    loading: "Lade Kameras …",
+    setStart: "Tippe auf die Karte für den Start.",
+    camsLoaded: (n) => `${n} bekannte Kameras geladen. Tippe auf die Karte für den Start.`,
+    setDest: "Jetzt das Ziel antippen.",
+    routing: "Berechne Route …",
+    alreadyMinimal: "Der kürzeste Weg ist bei dieser Einstellung bereits kamera-minimal.",
+    detour: (extra, saved, total, radius) =>
+      `+${extra} Umweg vermeidet ${saved} von ${total} Kameras (Zonenradius ${radius} m).`,
+    offCams: (n) => `Kürzester Weg — passiert ${n} bekannte Kameras (rote Abschnitte).`,
+    offNone: "Kürzester Weg — passiert keine bekannten Kameras.",
+    popupCamera: "Kamera",
+    noCamData: "keine Kameradaten auf dem Server",
+  },
+}[LANG];
+
+document.querySelectorAll("[data-i18n]").forEach((el) => {
+  el.textContent = STR[el.dataset.i18n];
+});
+document.querySelectorAll("[data-i18n-html]").forEach((el) => {
+  el.innerHTML = STR[el.dataset.i18nHtml];
+});
+
+/* ---------------- map ---------------------------------------------------- */
+
 const map = L.map("map", { zoomControl: false }).setView([52.503, 13.424], 14);
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -31,10 +120,10 @@ const alphaValueEl = document.getElementById("alpha-value");
 
 // slider stops: how far out of your way to go to stay out of camera view
 const AVOIDANCE = [
-  { alpha: 0, label: "off", color: "#6b7280" },
-  { alpha: 5, label: "a little", color: "#65a30d" },
-  { alpha: 15, label: "a lot", color: "#16a34a" },
-  { alpha: 60, label: "max", color: "#166534" },
+  { alpha: 0, label: STR.levels[0], color: "#6b7280" },
+  { alpha: 5, label: STR.levels[1], color: "#65a30d" },
+  { alpha: 15, label: STR.levels[2], color: "#16a34a" },
+  { alpha: 60, label: STR.levels[3], color: "#166534" },
 ];
 
 function currentAvoidance() {
@@ -67,13 +156,13 @@ function cameraPopup(props) {
     .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
     .join("");
   const [type, id] = (props.osm_id || "/").split("/");
-  return `<b>camera</b> <a href="https://www.openstreetmap.org/${type}/${id}" target="_blank">${props.osm_id}</a>
+  return `<b>${STR.popupCamera}</b> <a href="https://www.openstreetmap.org/${type}/${id}" target="_blank">${props.osm_id}</a>
           <table class="cam-tags">${rows}</table>`;
 }
 
 fetch("/api/cameras")
   .then((r) => {
-    if (!r.ok) throw new Error("no camera data on server");
+    if (!r.ok) throw new Error(STR.noCamData);
     return r.json();
   })
   .then((geojson) => {
@@ -88,7 +177,7 @@ fetch("/api/cameras")
           fillOpacity: 0.6,
         }).bindPopup(cameraPopup(feat.properties)),
     }).addTo(cameraLayer);
-    setStatus(`${geojson.features.length} known cameras loaded. Click to set start.`);
+    setStatus(STR.camsLoaded(geojson.features.length));
   })
   .catch((err) => setStatus(err.message, true));
 
@@ -107,7 +196,7 @@ map.on("click", (e) => {
   if (!markerA) {
     markerA = L.marker(e.latlng, { draggable: true, icon: pinIcon("A", "marker-a") }).addTo(map);
     markerA.on("dragend", requestRoute);
-    setStatus("Now click the destination.");
+    setStatus(STR.setDest);
   } else if (!markerB) {
     markerB = L.marker(e.latlng, { draggable: true, icon: pinIcon("B", "marker-b") }).addTo(map);
     markerB.on("dragend", requestRoute);
@@ -124,7 +213,7 @@ document.getElementById("clear").addEventListener("click", () => {
   markerA = markerB = null;
   routeLayer.clearLayers();
   statsEl.hidden = true;
-  setStatus("Click the map to set start.");
+  setStatus(STR.setStart);
 });
 
 /* ---------------- controls ---------------- */
@@ -169,7 +258,7 @@ function requestRoute() {
   });
 
   const seq = ++requestSeq;
-  setStatus("Routing …");
+  setStatus(STR.routing);
 
   fetch(`/api/route?${params}`)
     .then(async (r) => {
@@ -216,19 +305,14 @@ function render(data) {
   statsEl.hidden = false;
 
   if (!avoiding) {
-    setStatus(
-      baseline.n_cameras
-        ? `Shortest path — passes ${baseline.n_cameras} known cameras (red parts).`
-        : "Shortest path — passes no known cameras."
-    );
+    setStatus(baseline.n_cameras ? STR.offCams(baseline.n_cameras) : STR.offNone);
   } else if (avoiding.same_as_baseline) {
-    setStatus("Shortest path is already camera-minimal at this setting.");
+    setStatus(STR.alreadyMinimal);
   } else {
     const extra = avoiding.distance_m - baseline.distance_m;
     const saved = baseline.n_cameras - avoiding.n_cameras;
     setStatus(
-      `+${fmtDist(extra)} detour avoids ${saved} of ${baseline.n_cameras} cameras ` +
-      `(zone radius ${data.exposure_radius_m} m).`
+      STR.detour(fmtDist(extra), saved, baseline.n_cameras, data.exposure_radius_m)
     );
   }
 
