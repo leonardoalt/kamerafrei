@@ -103,8 +103,13 @@ compute_exposure.py per-edge     routing.py Router (A*,
 - `make export-web` — binary CSR graphs for the in-browser router
   (docs/CLIENT_ROUTING.md; served at /web-data/). `make verify-client`
   runs the parity harness: JS router costs must match the Python oracle.
-  Client routing is opt-in via `?client=1` until the PWA step lands;
-  local failures fall back to the server automatically.
+  Client routing is the DEFAULT (skipped on data-saver connections;
+  `?client=0` forces the server for debugging); local failures fall back
+  to the server automatically. Static asset URLs carry `?v=N` — bump on
+  every frontend/graph change, or browsers and the edge serve stale code
+  (a cached 404 on an unversioned URL cost us an afternoon).
+  uvicorn runs with --no-access-log: the UI promises route coordinates
+  are never logged; keep that true.
 - Deploy (see DEPLOY.md): 4 GB VPS + `docker compose --profile prod up -d`
   (app + cloudflared tunnel; token in `.env`). Build data locally and rsync —
   the graph build peaks above 4 GB. `scripts/refresh_cameras.sh` is the
@@ -114,9 +119,10 @@ compute_exposure.py per-edge     routing.py Router (A*,
 
 ## Roadmap (not built yet)
 
-1. Client-side routing — exporter, JS A* worker, parity harness, and
-   ?client=1 integration are DONE; remaining: service worker cache, PWA
-   manifest, flip default on, then optional static hosting.
+1. Client-side routing — DONE and default; remaining: service worker
+   cache + PWA manifest (offline/installable), then optional static
+   hosting. Consider pre-compressed graph serving (.bin is 21 MB raw,
+   9 MB gzipped; Cloudflare doesn't compress octet-stream).
 2. View-cone exposure model + building shadowing (display cones exist;
    routing exposure still uses 25 m discs).
 3. Other cities (pipeline is city-agnostic — only place/bbox changes).

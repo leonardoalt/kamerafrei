@@ -10,4 +10,5 @@ COPY pipeline pipeline
 
 # graphs + cameras are NOT baked in: mount ./data (see compose.yaml)
 EXPOSE 8000
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: route queries carry coordinates; we promise not to log them
+CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

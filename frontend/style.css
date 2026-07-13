@@ -207,7 +207,7 @@ html, body {
 .disclaimer {
   font-size: 11px;
   color: #666;
-  margin: 0;
+  margin: 0 0 6px;
 }
 
 .marker-pin {

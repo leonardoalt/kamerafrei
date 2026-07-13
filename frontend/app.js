@@ -50,6 +50,10 @@ const STR = {
     offlineReady: "Offline routing active — routes compute on this device.",
     engineLocal: (ms) => `⚡ computed on this device in ${ms} ms`,
     engineServer: (ms) => `computed on the server in ${ms} ms`,
+    privacy:
+      "<strong>Privacy:</strong> routes are computed on your device whenever " +
+      "possible; the server fallback stores nothing and keeps no logs. " +
+      "No accounts, no tracking.",
   },
   de: {
     subtitle:
@@ -95,6 +99,10 @@ const STR = {
     offlineReady: "Offline-Routing aktiv — Routen werden auf diesem Gerät berechnet.",
     engineLocal: (ms) => `⚡ auf diesem Gerät berechnet (${ms} ms)`,
     engineServer: (ms) => `auf dem Server berechnet (${ms} ms)`,
+    privacy:
+      "<strong>Privatsphäre:</strong> Routen werden wenn möglich auf deinem " +
+      "Gerät berechnet; der Server-Fallback speichert nichts und führt keine " +
+      "Logs. Keine Konten, kein Tracking.",
   },
 }[LANG];
 
@@ -415,8 +423,12 @@ function debounceRoute() {
 
 /* ---------------- client-side routing (enable with ?client=1) ------------ */
 
+// client-side routing is the default; ?client=0 forces the server (debugging),
+// and data-saver connections skip the eager graph download
 const CLIENT_MODE =
-  new URLSearchParams(location.search).has("client") && typeof Worker !== "undefined";
+  typeof Worker !== "undefined" &&
+  new URLSearchParams(location.search).get("client") !== "0" &&
+  !(navigator.connection && navigator.connection.saveData);
 const localReady = { walk: false, bike: false };
 const pendingLocal = new Map(); // id -> {resolve, reject}
 let worker = null;
@@ -429,7 +441,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=9", { type: "module" });
+    worker = new Worker("worker.js?v=10", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "progress" && m.total && statusIsIdle()) {
@@ -454,7 +466,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=9`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=10`,
     camerasUrl: "/api/cameras",
   });
 }
