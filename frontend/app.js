@@ -429,7 +429,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=7", { type: "module" });
+    worker = new Worker("worker.js?v=9", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "progress" && m.total && statusIsIdle()) {
@@ -450,10 +450,11 @@ function initClientRouting(profile) {
     };
     worker.onerror = (e) => console.warn("routing worker failed:", e.message);
   }
+  // versioned: a browser-cached error response must never pin the graph URL
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=9`,
     camerasUrl: "/api/cameras",
   });
 }
