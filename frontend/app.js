@@ -1,6 +1,19 @@
 /* kamerafrei — camera-avoiding route planner (frontend) */
 
-const map = L.map("map", { zoomControl: true }).setView([52.503, 13.424], 14);
+const map = L.map("map", { zoomControl: false }).setView([52.503, 13.424], 14);
+L.control.zoom({ position: "bottomright" }).addTo(map);
+
+// params live in a collapsible panel; phones start collapsed so the map wins
+const panel = document.getElementById("panel");
+const panelToggle = document.getElementById("panel-toggle");
+if (window.matchMedia("(max-width: 640px)").matches) {
+  panel.classList.add("collapsed");
+  panelToggle.setAttribute("aria-expanded", "false");
+}
+panelToggle.addEventListener("click", () => {
+  const collapsed = panel.classList.toggle("collapsed");
+  panelToggle.setAttribute("aria-expanded", String(!collapsed));
+});
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,

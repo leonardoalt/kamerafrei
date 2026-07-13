@@ -22,11 +22,33 @@ html, body {
   padding: 14px 16px;
 }
 
+#panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 #panel h1 {
   margin: 0;
   font-size: 22px;
   letter-spacing: 0.04em;
 }
+
+#panel-toggle {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: #374151;
+  transition: transform 0.15s;
+}
+
+#panel.collapsed #panel-toggle { transform: rotate(-90deg); }
+#panel.collapsed #panel-body { display: none; }
+
+#panel-body { margin-top: 4px; }
 
 .subtitle {
   margin: 4px 0 12px;
@@ -159,3 +181,15 @@ html, body {
 .marker-pin span { transform: rotate(45deg); }
 .marker-a { background: #16a34a; }
 .marker-b { background: #dc2626; }
+
+@media (max-width: 640px) {
+  #panel {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    padding: 10px 14px;
+    max-height: 70%;
+  }
+  #panel h1 { font-size: 18px; }
+  .subtitle { margin-bottom: 8px; }
+}

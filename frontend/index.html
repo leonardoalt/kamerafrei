@@ -29,9 +29,16 @@
   <div id="map"></div>
 
   <div id="panel">
-    <h1>kamerafrei</h1>
+    <div id="panel-header">
+      <h1>kamerafrei</h1>
+      <button id="panel-toggle" aria-expanded="true" aria-controls="panel-body"
+              title="Show/hide options">▾</button>
+    </div>
+    <div id="status">Loading cameras …</div>
+
+    <div id="panel-body">
     <p class="subtitle">Routes that avoid known surveillance cameras.<br />
-      Click the map to set start and destination.</p>
+      Tap the map to set start and destination.</p>
 
     <div class="row">
       <label class="seg">
@@ -49,8 +56,6 @@
              title="how far out of your way to go to stay out of camera view" />
       <span id="alpha-value"></span>
     </div>
-
-    <div id="status">Loading cameras …</div>
 
     <table id="stats" hidden>
       <thead>
@@ -77,6 +82,7 @@
       <a href="https://sunders.uber.space">Surveillance under Surveillance</a>.
       Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only.
     </p>
+    </div><!-- /panel-body -->
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
