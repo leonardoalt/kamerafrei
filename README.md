@@ -4,7 +4,8 @@
 route planner for Berlin that minimizes exposure to known
 surveillance cameras, using OpenStreetMap `man_made=surveillance` data —
 the same data [Surveillance under Surveillance](https://sunders.uber.space)
-visualizes. See [PLAN.md](PLAN.md) for the full design.
+visualizes. See [AGENTS.md](AGENTS.md) for architecture, technical
+decisions, and roadmap.
 
 **How it works:** an offline pipeline builds Berlin's walk/bike network with
 osmnx and annotates every edge with `exposure` — the meters of that edge
