@@ -68,17 +68,13 @@ with `distance_m`, `duration_min`, `n_cameras`, `exposed_m`, and
 ## Deploying
 
 The server is self-contained once `data/` exists (graphs + cameras, ~85 MB
-on disk, ~2.5 GB in RAM for both profiles). `data/` is not in git — build it
-on the server with `make venv berlin`, or build locally and `rsync data/` up.
+on disk, ~2.5 GB in RAM for both profiles; `data/` is not in git). Production
+setup for kamerafrei.com — a 4 GB VPS with Docker behind a Cloudflare
+Tunnel — is documented step by step in [DEPLOY.md](DEPLOY.md). Local:
 
 ```sh
-docker compose up -d     # serves on :8000, mounts ./data read-only
+docker compose up -d     # serves on 127.0.0.1:8000, mounts ./data read-only
 ```
-
-Any VPS with ≥4 GB RAM works (e.g. the smallest Hetzner/Netcup tiers). Put a
-reverse proxy with TLS (Caddy, nginx) in front for public use. Map tiles are
-fetched by the visitor's browser straight from openstreetmap.org — fine at
-hobby scale under their tile policy; switch to a tile provider if it grows.
 
 ## Refreshing data
 

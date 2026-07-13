@@ -11,6 +11,8 @@ cameras, using OSM `man_made=surveillance` data — the same data
 [Surveillance under Surveillance](https://sunders.uber.space) visualizes.
 Project was originally called "invisible"; renamed 2026-07 (GitHub redirects).
 Repo: https://github.com/leonardoalt/kamerafrei
+Domain: kamerafrei.com (Cloudflare Registrar; served via Cloudflare Tunnel,
+see DEPLOY.md)
 
 ## Core model
 
@@ -98,9 +100,12 @@ compute_exposure.py per-edge     routing.py Router (A*,
   re-downloading the street network.
 - `make serve` — uvicorn on 127.0.0.1:8000 (serves API + frontend together;
   no CORS needed).
-- Deploy: `docker compose up -d` with `./data` mounted read-only; ≥4 GB RAM
-  VPS; reverse proxy for TLS. Map tiles come from openstreetmap.org
-  (fair-use; switch provider if traffic grows).
+- Deploy (see DEPLOY.md): 4 GB VPS + `docker compose --profile prod up -d`
+  (app + cloudflared tunnel; token in `.env`). Build data locally and rsync —
+  the graph build peaks above 4 GB. `scripts/refresh_cameras.sh` is the
+  weekly cron. Compose profiles: default = app only, `prod` adds the tunnel,
+  `tools` = one-off pipeline runs with rw data mount. Map tiles come from
+  openstreetmap.org (fair-use; switch provider if traffic grows).
 
 ## Roadmap (not built yet)
 

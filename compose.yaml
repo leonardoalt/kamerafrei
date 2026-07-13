@@ -2,9 +2,29 @@ services:
   kamerafrei:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000" # local/debug only; public traffic arrives via the tunnel
     volumes:
       - ./data:/app/data:ro
     restart: unless-stopped
     # walk + bike graphs for all of Berlin need ~2.5 GB resident
-    mem_limit: 4g
+    mem_limit: 3g
+
+  # production only: outbound tunnel to Cloudflare, no open ports needed
+  # (docker compose --profile prod up -d). Token comes from .env — see DEPLOY.md
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-} # empty default so local `up` works without .env
+    depends_on:
+      - kamerafrei
+    restart: unless-stopped
+    profiles: ["prod"]
+
+  # one-off pipeline runs with write access to data/ (weekly camera refresh):
+  #   docker compose run --rm pipeline python pipeline/fetch_cameras.py
+  pipeline:
+    build: .
+    volumes:
+      - ./data:/app/data
+    profiles: ["tools"]
