@@ -482,10 +482,15 @@ async function copyText(text) {
   return ok;
 }
 
+// share sheet only on mobile: desktop Chrome/Linux exposes navigator.share
+// but its portal integration can hang the promise with no error and no UI
+const IS_MOBILE =
+  navigator.userAgentData?.mobile ?? /android|iphone|ipad|mobile/i.test(navigator.userAgent);
+
 document.getElementById("share-btn").addEventListener("click", async () => {
   if (!markerA || !markerB) return;
   const url = routeUrl();
-  if (navigator.share) {
+  if (IS_MOBILE && navigator.share) {
     try {
       await navigator.share({ title: "kamerafrei", url });
       return; // the OS share sheet is its own feedback
@@ -648,7 +653,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=17", { type: "module" });
+    worker = new Worker("worker.js?v=18", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -675,7 +680,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=17`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=18`,
     camerasUrl: "/api/cameras",
   });
 }

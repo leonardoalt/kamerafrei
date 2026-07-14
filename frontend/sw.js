@@ -12,7 +12,7 @@
  * VERSION must move with the ?v= asset version in index.html.
  */
 
-const VERSION = "17"; // keep equal to the ?v= asset version in index.html
+const VERSION = "18"; // keep equal to the ?v= asset version in index.html
 const SHELL_CACHE = `kf-shell-${VERSION}`;
 const DATA_CACHE = "kf-data-v1";
 const TILE_CACHE = "kf-tiles-v1";
