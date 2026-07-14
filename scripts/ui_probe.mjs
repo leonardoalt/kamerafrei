@@ -77,6 +77,14 @@ const send = (method, params) =>
   });
 
 for (const expression of exprs) {
+  if (expression.startsWith("SCREENSHOT:")) {
+    const file = expression.slice("SCREENSHOT:".length);
+    const resp = await send("Page.captureScreenshot", { format: "png" });
+    const { writeFileSync } = await import("node:fs");
+    writeFileSync(file, Buffer.from(resp.result.data, "base64"));
+    console.log(JSON.stringify({ screenshot: file }));
+    continue;
+  }
   const resp = await send("Runtime.evaluate", {
     expression,
     awaitPromise: true,

@@ -1,5 +1,8 @@
 * { box-sizing: border-box; }
 
+/* the hidden attribute must win over display rules like .row {display:flex} */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
