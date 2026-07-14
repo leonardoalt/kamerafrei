@@ -12,7 +12,7 @@
  * VERSION must move with the ?v= asset version in index.html.
  */
 
-const VERSION = "18"; // keep equal to the ?v= asset version in index.html
+const VERSION = "19"; // keep equal to the ?v= asset version in index.html
 const SHELL_CACHE = `kf-shell-${VERSION}`;
 const DATA_CACHE = "kf-data-v1";
 const TILE_CACHE = "kf-tiles-v1";
@@ -24,6 +24,7 @@ const SHELL = [
   `/app.js?v=${VERSION}`,
   `/worker.js?v=${VERSION}`,
   `/router.js?v=${VERSION}`,
+  `/leaflet-heat.js?v=${VERSION}`,
   "/favicon.svg",
   "/manifest.webmanifest",
   "/icon-192.png",

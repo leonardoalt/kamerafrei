@@ -1,0 +1,73 @@
+name: data-release
+
+# Weekly fresh Berlin data as a GitHub release: cameras + buildings are
+# re-fetched, exposure recomputed on the previous release's graphs, and
+# web binaries re-exported. DEPLOY.md step 3 downloads from
+# releases/latest, so new installs always get current data.
+#
+# Manual runs can pass rebuild_graphs=true to also rebuild the street
+# network from Overpass (slow; needed maybe a few times a year).
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      rebuild_graphs:
+        description: "Rebuild the street network from Overpass (slow)"
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Reuse graphs from the previous release
+        if: ${{ inputs.rebuild_graphs != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data
+          gh release download --pattern 'graph_*.pkl.gz' --dir data
+
+      - name: Rebuild street network from Overpass
+        if: ${{ inputs.rebuild_graphs == 'true' }}
+        run: python pipeline/build_graph.py --profile both
+
+      - name: Fetch cameras and buildings
+        run: |
+          python pipeline/fetch_cameras.py
+          python pipeline/fetch_buildings.py
+
+      - name: Compute exposure and export web graphs
+        run: |
+          python pipeline/compute_exposure.py --graph data/graph_walk.pkl.gz
+          python pipeline/compute_exposure.py --graph data/graph_bike.pkl.gz
+          python pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin
+          python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="data-$(date -u +%F)"
+          gh release delete "$tag" --yes 2>/dev/null || true
+          gh release create "$tag" \
+            data/graph_walk.pkl.gz data/graph_bike.pkl.gz \
+            data/cameras.geojson data/buildings.geojson \
+            data/web/graph_walk.bin data/web/graph_walk.bin.gz \
+            data/web/graph_bike.bin data/web/graph_bike.bin.gz \
+            --title "Berlin data $(date -u +%F)" \
+            --notes "Automated weekly data build: OSM cameras + buildings re-fetched, cone+shadow exposure recomputed, web binaries exported. Data © OpenStreetMap contributors, ODbL."

@@ -61,6 +61,7 @@ const STR = {
     gpx: "⬇ GPX",
     linkCopied: "Route link copied to the clipboard.",
     gpxName: (profile) => `kamerafrei ${profile} route`,
+    heatmap: "camera heatmap",
   },
   de: {
     subtitle:
@@ -117,6 +118,7 @@ const STR = {
     gpx: "⬇ GPX",
     linkCopied: "Routen-Link in die Zwischenablage kopiert.",
     gpxName: (profile) => `kamerafrei ${profile === "walk" ? "Fußweg" : "Radweg"}`,
+    heatmap: "Kamera-Heatmap",
   },
 }[LANG];
 
@@ -366,6 +368,12 @@ fetch("/api/cameras")
     // don't clobber an already-displayed route summary
     if (!lastRendered) setStatus(STR.camsLoaded(geojson.features.length));
 
+    cameraLatLngs = geojson.features.map((f) => [
+      f.geometry.coordinates[1],
+      f.geometry.coordinates[0],
+      0.6,
+    ]);
+
     for (const feat of geojson.features) {
       const props = feat.properties;
       if (props["camera:type"] === "dome") continue;
@@ -383,6 +391,31 @@ fetch("/api/cameras")
 
   })
   .catch((err) => setStatus(err.message, true));
+
+/* ---------------- camera density heatmap ---------------------------------- */
+
+let cameraLatLngs = [];
+let heatLayer = null;
+
+document.getElementById("heat-toggle").addEventListener("change", (e) => {
+  if (e.target.checked) {
+    if (typeof L.heatLayer !== "function" || !cameraLatLngs.length) {
+      e.target.checked = false;
+      return;
+    }
+    if (!heatLayer) {
+      heatLayer = L.heatLayer(cameraLatLngs, {
+        radius: 22,
+        blur: 18,
+        maxZoom: 17,
+        minOpacity: 0.25,
+      });
+    }
+    heatLayer.addTo(map);
+  } else if (heatLayer) {
+    map.removeLayer(heatLayer);
+  }
+});
 
 /* ---------------- markers ---------------- */
 
@@ -653,7 +686,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=18", { type: "module" });
+    worker = new Worker("worker.js?v=19", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -680,7 +713,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=18`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=19`,
     camerasUrl: "/api/cameras",
   });
 }

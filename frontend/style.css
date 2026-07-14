@@ -194,6 +194,15 @@ html, body {
 
 #share-note.fading { opacity: 0; }
 
+.heat-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;

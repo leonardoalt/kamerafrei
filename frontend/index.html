@@ -26,7 +26,7 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=18" />
+  <link rel="stylesheet" href="style.css?v=19" />
 </head>
 <body>
   <div id="map"></div>
@@ -87,6 +87,13 @@
     </div>
     <div id="share-note" hidden></div>
 
+    <div class="row">
+      <label class="heat-row">
+        <input type="checkbox" id="heat-toggle" />
+        <span data-i18n="heatmap">camera heatmap</span>
+      </label>
+    </div>
+
     <div class="legend">
       <span><i class="sw sw-avoid"></i> <span data-i18n="legRoute">route</span></span>
       <span><i class="sw sw-short"></i> <span data-i18n="legShort">shortest (comparison)</span></span>
@@ -111,6 +118,7 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="app.js?v=18"></script>
+  <script src="leaflet-heat.js?v=19"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
