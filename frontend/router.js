@@ -226,30 +226,38 @@ function readVarint(pool, pos) {
   return (value >>> 1) ^ -(value & 1); // un-zigzag
 }
 
-export function routeCoords(g, result) {
+export function edgeCoords(g, u, e) {
   const scale = g.meta.geom_scale;
   const cs = g.meta.coord_scale;
-  const coords = [];
-  const pushNode = (n) => coords.push([g.lat[n] / cs, g.lon[n] / cs]);
-
-  pushNode(result.nodes[0]);
-  for (let k = 0; k < result.edges.length; k++) {
-    const e = result.edges[k];
-    const u = result.nodes[k];
-    const gi = g.geomIdx[e];
-    if (gi !== 0) {
-      const pos = { i: gi - 1 };
-      const count = readVarint(g.geomPool, pos) >>> 0;
-      if (count > 100000) throw new Error(`corrupt geometry (count ${count})`);
-      let lat = Math.round(g.lat[u] / (cs / scale));
-      let lon = Math.round(g.lon[u] / (cs / scale));
-      for (let p = 0; p < count; p++) {
-        lat += readVarint(g.geomPool, pos);
-        lon += readVarint(g.geomPool, pos);
-        coords.push([lat / scale, lon / scale]);
-      }
+  const v = g.tgt[e];
+  const coords = [[g.lat[u] / cs, g.lon[u] / cs]];
+  const gi = g.geomIdx[e];
+  if (gi !== 0) {
+    const pos = { i: gi - 1 };
+    const count = readVarint(g.geomPool, pos) >>> 0;
+    if (count > 100000) throw new Error(`corrupt geometry (count ${count})`);
+    let lat = Math.round(g.lat[u] / (cs / scale));
+    let lon = Math.round(g.lon[u] / (cs / scale));
+    for (let p = 0; p < count; p++) {
+      lat += readVarint(g.geomPool, pos);
+      lon += readVarint(g.geomPool, pos);
+      coords.push([lat / scale, lon / scale]);
     }
-    pushNode(result.nodes[k + 1]);
+  }
+  coords.push([g.lat[v] / cs, g.lon[v] / cs]);
+  return coords;
+}
+
+export function routeCoords(g, result) {
+  const coords = [];
+  for (let k = 0; k < result.edges.length; k++) {
+    const ec = edgeCoords(g, result.nodes[k], result.edges[k]);
+    coords.push(...(coords.length ? ec.slice(1) : ec));
+  }
+  if (!coords.length) {
+    const cs = g.meta.coord_scale;
+    const n = result.nodes[0];
+    coords.push([g.lat[n] / cs, g.lon[n] / cs], [g.lat[n] / cs, g.lon[n] / cs]);
   }
   return coords;
 }

@@ -18,8 +18,8 @@ const STR = {
     thAvoid: "low-camera",
     rowDist: "distance",
     rowTime: "time",
-    rowCams: "cameras passed",
-    rowExp: "exposed",
+    rowCams: "cameras nearby",
+    rowExp: "in camera view",
     legRoute: "route",
     legShort: "shortest (comparison)",
     legExposed: "in camera view",
@@ -36,10 +36,11 @@ const STR = {
     setDest: "Now tap the destination.",
     routing: "Routing …",
     alreadyMinimal: "Shortest path is already camera-minimal at this setting.",
-    detour: (extra, saved, total, radius) =>
-      `+${extra} detour avoids ${saved} of ${total} cameras (zone radius ${radius} m).`,
-    offCams: (n) => `Shortest path — passes ${n} known cameras (red parts).`,
-    offNone: "Shortest path — passes no known cameras.",
+    detour: (extra, seenFrom, seenTo) =>
+      `+${extra} detour: in camera view ${seenFrom} → ${seenTo}.`,
+    detourUnseen: (extra) => `+${extra} detour — out of every known camera's view.`,
+    offSeen: (m) => `Shortest path — ${m} in camera view (red parts).`,
+    offNone: "Shortest path — out of every known camera's view.",
     popupCamera: "camera",
     noCamData: "no camera data on the server",
     phStart: "Start address …",
@@ -73,8 +74,8 @@ const STR = {
     thAvoid: "kameraarm",
     rowDist: "Distanz",
     rowTime: "Zeit",
-    rowCams: "Kameras",
-    rowExp: "exponiert",
+    rowCams: "Kameras nah",
+    rowExp: "im Kamerablick",
     legRoute: "Route",
     legShort: "kürzeste (Vergleich)",
     legExposed: "im Kamerablick",
@@ -91,10 +92,11 @@ const STR = {
     setDest: "Jetzt das Ziel antippen.",
     routing: "Berechne Route …",
     alreadyMinimal: "Der kürzeste Weg ist bei dieser Einstellung bereits kamera-minimal.",
-    detour: (extra, saved, total, radius) =>
-      `+${extra} Umweg vermeidet ${saved} von ${total} Kameras (Zonenradius ${radius} m).`,
-    offCams: (n) => `Kürzester Weg — passiert ${n} bekannte Kameras (rote Abschnitte).`,
-    offNone: "Kürzester Weg — passiert keine bekannten Kameras.",
+    detour: (extra, seenFrom, seenTo) =>
+      `+${extra} Umweg: im Kamerablick ${seenFrom} → ${seenTo}.`,
+    detourUnseen: (extra) => `+${extra} Umweg — außerhalb aller bekannten Kamerablicke.`,
+    offSeen: (m) => `Kürzester Weg — ${m} im Kamerablick (rote Abschnitte).`,
+    offNone: "Kürzester Weg — außerhalb aller bekannten Kamerablicke.",
     popupCamera: "Kamera",
     noCamData: "keine Kameradaten auf dem Server",
     phStart: "Startadresse …",
@@ -604,7 +606,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=14", { type: "module" });
+    worker = new Worker("worker.js?v=15", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -631,7 +633,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=14`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=15`,
     camerasUrl: "/api/cameras",
   });
 }
@@ -747,14 +749,21 @@ function render(data) {
   statsEl.hidden = false;
 
   if (!avoiding) {
-    setStatus(baseline.n_cameras ? STR.offCams(baseline.n_cameras) : STR.offNone);
+    setStatus(
+      baseline.exposed_m > 0 ? STR.offSeen(fmtDist(baseline.exposed_m)) : STR.offNone
+    );
   } else if (avoiding.same_as_baseline) {
     setStatus(STR.alreadyMinimal);
   } else {
     const extra = avoiding.distance_m - baseline.distance_m;
-    const saved = baseline.n_cameras - avoiding.n_cameras;
     setStatus(
-      STR.detour(fmtDist(extra), saved, baseline.n_cameras, data.exposure_radius_m)
+      avoiding.exposed_m === 0
+        ? STR.detourUnseen(fmtDist(extra))
+        : STR.detour(
+            fmtDist(extra),
+            fmtDist(baseline.exposed_m),
+            fmtDist(avoiding.exposed_m)
+          )
     );
   }
 

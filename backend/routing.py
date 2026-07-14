@@ -155,9 +155,17 @@ class Router:
     def _describe(self, path: list, alpha: float) -> dict:
         coords: list[tuple] = []
         length = 0.0
+        seen_m = 0.0  # meters inside camera visibility zones (the cost model)
+        seen_pieces: list[list[tuple]] = []
         for u, v in zip(path[:-1], path[1:]):
             data = self._best_edge(u, v, alpha)
             edge_coords = self._edge_coords(u, v, data)
+            if data.get("exposure", 0.0) > 0:
+                seen_m += data["exposure"]
+                if seen_pieces and seen_pieces[-1][-1] == edge_coords[0]:
+                    seen_pieces[-1].extend(edge_coords[1:])
+                else:
+                    seen_pieces.append(list(edge_coords))
             if coords:
                 edge_coords = edge_coords[1:]
             coords.extend(edge_coords)
@@ -168,12 +176,13 @@ class Router:
             coords = [(node["x"], node["y"])] * 2
 
         line = LineString(coords)
-        exposed, exposed_m, camera_ids = self.cameras.analyze(line)
+        # n_cameras stays proximity-based ("cameras nearby"); exposed_m and
+        # the red segments follow the routing model (visibility zones)
+        _, _, camera_ids = self.cameras.analyze(line)
 
         def project_back(geom):
             return shapely_transform(self.to_wgs84.transform, geom)
 
-        exposed_parts = [project_back(g) for g in _line_parts(exposed)]
         speed_m_min = SPEED_KMH[self.profile] * 1000 / 60
 
         return {
@@ -182,12 +191,15 @@ class Router:
             "node_path": path,
             "distance_m": round(length, 1),
             "duration_min": round(length / speed_m_min, 1),
-            "exposed_m": round(exposed_m, 1),
+            "exposed_m": round(seen_m, 1),
             "n_cameras": len(camera_ids),
             "camera_ids": camera_ids,
             "geometry": mapping(project_back(line)),
             "exposed_geometry": {
                 "type": "MultiLineString",
-                "coordinates": [list(g.coords) for g in exposed_parts],
+                "coordinates": [
+                    list(project_back(LineString(piece)).coords)
+                    for piece in seen_pieces
+                ],
             },
         }

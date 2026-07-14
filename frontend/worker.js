@@ -2,7 +2,7 @@
  * client-side. Response shape mirrors /api/route so the UI can't tell
  * whether the server or this worker answered. */
 
-import { parseGraph, nearestNode, route, routeCoords } from "./router.js?v=14";
+import { parseGraph, nearestNode, route, routeCoords, edgeCoords } from "./router.js?v=15";
 
 const SPEED_KMH = { walk: 4.8, bike: 15.0 };
 
@@ -129,17 +129,30 @@ function analyzeExposure(coords, radiusM) {
 
 function describe(g, profile, result, alpha) {
   const coords = routeCoords(g, result);
-  const { exposed_m, n_cameras, pieces } = analyzeExposure(
-    coords,
-    g.meta.exposure_radius_m
-  );
+  // n_cameras = proximity ("cameras nearby", disc); exposed_m and the red
+  // segments follow the routing model (visibility-zone meters, per edge)
+  const { n_cameras } = analyzeExposure(coords, g.meta.exposure_radius_m);
+
+  const pieces = [];
+  for (let k = 0; k < result.edges.length; k++) {
+    const e = result.edges[k];
+    if (g.exp[e] === 0) continue;
+    const ec = edgeCoords(g, result.nodes[k], e).map(([lat, lon]) => [lon, lat]);
+    const prev = pieces[pieces.length - 1];
+    if (prev && prev[prev.length - 1][0] === ec[0][0] && prev[prev.length - 1][1] === ec[0][1]) {
+      prev.push(...ec.slice(1));
+    } else {
+      pieces.push(ec);
+    }
+  }
+
   const speedMMin = (SPEED_KMH[profile] * 1000) / 60;
   return {
     alpha,
     profile,
     distance_m: Math.round(result.distance_m * 10) / 10,
     duration_min: Math.round((result.distance_m / speedMMin) * 10) / 10,
-    exposed_m: Math.round(exposed_m * 10) / 10,
+    exposed_m: Math.round(result.exposure_m * 10) / 10,
     n_cameras,
     geometry: {
       type: "LineString",
