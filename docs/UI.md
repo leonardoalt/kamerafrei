@@ -84,6 +84,29 @@ E. **Transient feedback** — copied, offline progress, errors, hints.
   never bury it. Desktop: plenty of room, don't waste it.
 - Secure-context quirks documented in AGENTS.md still apply.
 
-## Design direction (post-critique, see git history for the proposal)
+## Design direction (implemented 2026-07, v20)
 
-To be filled by the implemented redesign.
+Multi-surface layout, each element in one of four time classes
+(always / while-relevant / on-demand / momentary):
+
+- **Query card** (top-left, always): wordmark + ⓘ + chevron, tagline
+  (auto-hides after the first-ever route), address inputs, walk/bike +
+  clear, hint line (instructions only), 2px offline-download progress bar.
+  On mobile it auto-collapses to a "Start → Dest ✕" chip once routed.
+- **Results** (exists only with a route): desktop card under the query
+  card; mobile bottom sheet with peek (verdict only) / open detents,
+  drag or tap the handle. Order: hero verdict ("+1.16 km detour /
+  in camera view 652 m → 25 m", red→green numbers), avoidance slider,
+  stats, share/GPX, legend, engine note + "known cameras only ⓘ".
+  Routing errors render here with a recovery hint.
+- **About modal** (ⓘ, on demand): what/how/privacy/data-and-limits +
+  legend reference. All explainer paragraphs live here and only here.
+- **Toast** (bottom-center, momentary): copied-link, offline-ready,
+  geolocation errors.
+- **Map controls** (bottom-right): zoom, locate ⌖ (44px), heatmap 🔥
+  (pressed = brand green).
+- Verdict/status routing in JS: `setStatus` (verdict) · `setHint`
+  (query card) · `toast` · `setProgress`. fitBounds pads for the
+  surfaces per breakpoint. Tokens in style.css `:root`; interactive
+  accent is brand green (old blue retired except GPS dot).
+- Tested via scripts/ui_probe.mjs (CDP: click, evaluate, SCREENSHOT).

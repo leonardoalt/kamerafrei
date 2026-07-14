@@ -25,6 +25,7 @@ const chrome = spawn(
   [
     "--headless",
     "--disable-gpu",
+    `--window-size=${process.env.PROBE_SIZE || "1400,900"}`,
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     url,
@@ -34,7 +35,11 @@ const chrome = spawn(
 
 const cleanup = () => {
   chrome.kill();
-  rmSync(profile, { recursive: true, force: true });
+  try {
+    rmSync(profile, { recursive: true, force: true });
+  } catch {
+    /* chromium may still be flushing the profile */
+  }
 };
 process.on("exit", cleanup);
 

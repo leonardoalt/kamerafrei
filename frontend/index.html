@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>kamerafrei — camera-free routes for Berlin</title>
   <meta name="description"
         content="Plan walking and biking routes through Berlin that avoid known surveillance cameras, using OpenStreetMap data." />
@@ -26,99 +26,128 @@
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="style.css?v=19" />
+  <link rel="stylesheet" href="style.css?v=20" />
 </head>
 <body>
   <div id="map"></div>
 
-  <div id="panel">
-    <div id="panel-header">
-      <h1>kamerafrei</h1>
-      <button id="panel-toggle" aria-expanded="true" aria-controls="panel-body"
-              title="Show/hide options">▾</button>
-    </div>
-    <div id="status" data-i18n="loading">Loading cameras …</div>
+  <div id="left-col">
+    <!-- Query card: identity + route entry. Always present. -->
+    <section id="query-card">
+      <div id="query-header">
+        <h1>kamerafrei</h1>
+        <span id="chip-summary" hidden></span>
+        <button id="chip-clear" title="Clear route" hidden>✕</button>
+        <button id="about-btn" aria-haspopup="dialog" title="About">ⓘ</button>
+        <button id="panel-toggle" aria-expanded="true" aria-controls="query-body"
+                title="Show/hide options">▾</button>
+      </div>
+      <div id="query-body">
+        <p id="tagline" data-i18n="tagline">Routes that avoid known surveillance cameras.</p>
 
-    <div id="panel-body">
-    <p class="subtitle" data-i18n-html="subtitle">Routes that avoid known surveillance cameras.<br />
-      Tap the map to set start and destination.</p>
+        <div class="search">
+          <input id="search-a" data-i18n-ph="phStart" placeholder="Start address …" autocomplete="off" />
+          <ul id="search-a-results" class="results" hidden></ul>
+        </div>
+        <div class="search">
+          <input id="search-b" data-i18n-ph="phDest" placeholder="Destination address …" autocomplete="off" />
+          <ul id="search-b-results" class="results" hidden></ul>
+        </div>
 
-    <div class="search">
-      <input id="search-a" data-i18n-ph="phStart" placeholder="Start address …" autocomplete="off" />
-      <ul id="search-a-results" class="results" hidden></ul>
-    </div>
-    <div class="search">
-      <input id="search-b" data-i18n-ph="phDest" placeholder="Destination address …" autocomplete="off" />
-      <ul id="search-b-results" class="results" hidden></ul>
-    </div>
+        <div class="row">
+          <div class="seg-group">
+            <label class="seg">
+              <input type="radio" name="profile" value="walk" checked /> <span data-i18n="walk">🚶 walk</span>
+            </label>
+            <label class="seg">
+              <input type="radio" name="profile" value="bike" /> <span data-i18n="bike">🚲 bike</span>
+            </label>
+          </div>
+          <button id="clear" data-i18n="clear" title="Clear route">✕ clear</button>
+        </div>
 
-    <div class="row">
-      <label class="seg">
-        <input type="radio" name="profile" value="walk" checked /> <span data-i18n="walk">🚶 walk</span>
-      </label>
-      <label class="seg">
-        <input type="radio" name="profile" value="bike" /> <span data-i18n="bike">🚲 bike</span>
-      </label>
-      <button id="clear" data-i18n="clear" title="Clear route">✕ clear</button>
-    </div>
+        <div id="hint" data-i18n="loading">Loading cameras …</div>
+      </div>
+      <div id="progress" hidden><span id="progress-bar"></span></div>
+    </section>
 
-    <div class="row slider-row">
-      <label for="alpha" data-i18n="avoid">avoid cameras</label>
-      <input type="range" id="alpha" min="0" max="3" step="1" value="2"
-             title="how far out of your way to go to stay out of camera view" />
-      <span id="alpha-value"></span>
-    </div>
+    <!-- Results: card on desktop, bottom sheet on phones. Exists per route. -->
+    <section id="results" hidden aria-label="route results">
+      <button id="sheet-handle" aria-expanded="true"><span></span></button>
+      <div id="status"></div>
+      <div id="results-body">
+        <div class="row slider-row">
+          <label for="alpha" data-i18n="avoid">avoid cameras</label>
+          <input type="range" id="alpha" min="0" max="3" step="1" value="2"
+                 title="how far out of your way to go to stay out of camera view" />
+          <span id="alpha-value"></span>
+        </div>
 
-    <table id="stats" hidden>
-      <thead>
-        <tr><th></th><th class="c-short" data-i18n="thShort">shortest</th><th class="c-avoid" data-i18n="thAvoid">low-camera</th></tr>
-      </thead>
-      <tbody>
-        <tr><td data-i18n="rowDist">distance</td><td id="s-dist"></td><td id="a-dist"></td></tr>
-        <tr><td data-i18n="rowTime">time</td><td id="s-time"></td><td id="a-time"></td></tr>
-        <tr><td data-i18n="rowCams">cameras passed</td><td id="s-cams"></td><td id="a-cams"></td></tr>
-        <tr><td data-i18n="rowExp">exposed</td><td id="s-exp"></td><td id="a-exp"></td></tr>
-      </tbody>
-    </table>
-    <div id="engine-note" hidden></div>
-    <div class="row" id="route-actions" hidden>
-      <button id="share-btn" data-i18n="share">📤 share</button>
-      <button id="gpx-btn" data-i18n="gpx">⬇ GPX</button>
-    </div>
-    <div id="share-note" hidden></div>
+        <table id="stats" hidden>
+          <thead>
+            <tr><th></th><th class="c-short" data-i18n="thShort">shortest</th><th class="c-avoid" data-i18n="thAvoid">low-camera</th></tr>
+          </thead>
+          <tbody>
+            <tr><td data-i18n="rowDist">distance</td><td id="s-dist"></td><td id="a-dist"></td></tr>
+            <tr><td data-i18n="rowTime">time</td><td id="s-time"></td><td id="a-time"></td></tr>
+            <tr><td data-i18n="rowCams">cameras nearby</td><td id="s-cams"></td><td id="a-cams"></td></tr>
+            <tr><td data-i18n="rowExp">in camera view</td><td id="s-exp"></td><td id="a-exp"></td></tr>
+          </tbody>
+        </table>
 
-    <div class="row">
-      <label class="heat-row">
-        <input type="checkbox" id="heat-toggle" />
-        <span data-i18n="heatmap">camera heatmap</span>
-      </label>
-    </div>
+        <div class="row" id="route-actions" hidden>
+          <button id="share-btn" data-i18n="share">📤 share</button>
+          <button id="gpx-btn" data-i18n="gpx">⬇ GPX</button>
+        </div>
 
-    <div class="legend">
-      <span><i class="sw sw-avoid"></i> <span data-i18n="legRoute">route</span></span>
-      <span><i class="sw sw-short"></i> <span data-i18n="legShort">shortest (comparison)</span></span>
-      <span><i class="sw sw-exposed"></i> <span data-i18n="legExposed">in camera view</span></span>
-      <span><i class="dot"></i> <span data-i18n="legCam">camera</span></span>
-    </div>
+        <div class="legend">
+          <span><i class="sw sw-avoid"></i> <span data-i18n="legRoute">route</span></span>
+          <span><i class="sw sw-short"></i> <span data-i18n="legShort">shortest (comparison)</span></span>
+          <span><i class="sw sw-exposed"></i> <span data-i18n="legExposed">in camera view</span></span>
+          <span><i class="dot"></i> <span data-i18n="legCam">camera</span></span>
+        </div>
 
-    <p class="disclaimer" data-i18n-html="privacy">
-      <strong>Privacy:</strong> routes are computed on your device whenever
-      possible; the server fallback stores nothing and keeps no logs.
-      No accounts, no tracking.
-    </p>
-
-    <p class="disclaimer" data-i18n-html="disclaimer">
-      Camera data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>
-      contributors (<code>man_made=surveillance</code>), as visualized by
-      <a href="https://sunders.uber.space">Surveillance under Surveillance</a>.
-      Coverage is <strong>incomplete</strong>: this avoids <em>known</em> cameras only.
-    </p>
-    </div><!-- /panel-body -->
+        <div id="results-foot">
+          <span id="engine-note"></span>
+          <button id="known-note" data-i18n="known">known cameras only ⓘ</button>
+        </div>
+      </div>
+    </section>
   </div>
+
+  <!-- About: identity, privacy, data provenance, limits. On demand. -->
+  <div id="about" hidden role="dialog" aria-modal="true" aria-labelledby="about-title">
+    <div id="about-backdrop"></div>
+    <div id="about-dialog">
+      <div id="about-head">
+        <h2 id="about-title">kamerafrei</h2>
+        <button id="about-close" title="Close">✕</button>
+      </div>
+      <p data-i18n="aboutWhat">Routes through Berlin that stay out of the view of known
+        surveillance cameras — computed on your device, shareable, offline-capable.</p>
+      <h3 data-i18n="aboutHowTitle">How it works</h3>
+      <p data-i18n="aboutHow">Camera positions and directions come from OpenStreetMap.
+        Each camera gets a realistic visibility zone (view cones, blocked by buildings);
+        the router finds paths that minimize the meters inside those zones. The
+        avoidance level sets how much detour you accept.</p>
+      <h3 data-i18n="aboutPrivacyTitle">Privacy</h3>
+      <p data-i18n-html="privacy"></p>
+      <h3 data-i18n="aboutDataTitle">Data &amp; limits</h3>
+      <p data-i18n-html="disclaimer"></p>
+      <div class="legend">
+        <span><i class="sw sw-avoid"></i> <span data-i18n="legRoute">route</span></span>
+        <span><i class="sw sw-short"></i> <span data-i18n="legShort">shortest (comparison)</span></span>
+        <span><i class="sw sw-exposed"></i> <span data-i18n="legExposed">in camera view</span></span>
+        <span><i class="dot"></i> <span data-i18n="legCam">camera</span></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite" hidden></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="leaflet-heat.js?v=19"></script>
-  <script src="app.js?v=19"></script>
+  <script src="leaflet-heat.js?v=20"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

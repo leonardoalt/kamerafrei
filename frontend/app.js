@@ -7,8 +7,6 @@ document.documentElement.lang = LANG;
 
 const STR = {
   en: {
-    subtitle:
-      "Routes that avoid known surveillance cameras.<br />Tap the map to set start and destination.",
     walk: "🚶 walk",
     bike: "🚲 bike",
     clear: "✕ clear",
@@ -37,17 +35,17 @@ const STR = {
     routing: "Routing …",
     alreadyMinimal: "Shortest path is already camera-minimal at this setting.",
     detour: (extra, seenFrom, seenTo) =>
-      `+${extra} detour: in camera view ${seenFrom} → ${seenTo}.`,
-    detourUnseen: (extra) => `+${extra} detour — out of every known camera's view.`,
-    offSeen: (m) => `Shortest path — ${m} in camera view (red parts).`,
-    offNone: "Shortest path — out of every known camera's view.",
+      `+${extra} detour<br>in camera view <span class="hero-bad">${seenFrom}</span> → <span class="hero-good">${seenTo}</span>`,
+    detourUnseen: (extra) =>
+      `+${extra} detour — <span class="good">out of every known camera's view.</span>`,
+    offSeen: (m) => `Shortest path — <span class="hero-bad">${m}</span> in camera view (red parts).`,
+    offNone: 'Shortest path — <span class="good">out of every known camera\'s view.</span>',
     popupCamera: "camera",
     noCamData: "no camera data on the server",
     phStart: "Start address …",
     phDest: "Destination address …",
     searching: "Searching …",
     noResults: "No results in Berlin.",
-    offlineProgress: (pct) => `Offline routing: downloading ${pct}%`,
     offlineReady: "Offline routing active — routes compute on this device.",
     engineLocal: (ms) => `⚡ computed on this device in ${ms} ms`,
     engineServer: (ms) => `computed on the server in ${ms} ms`,
@@ -62,10 +60,22 @@ const STR = {
     linkCopied: "Route link copied to the clipboard.",
     gpxName: (profile) => `kamerafrei ${profile} route`,
     heatmap: "camera heatmap",
+    tagline: "Routes that avoid known surveillance cameras.",
+    known: "known cameras only ⓘ",
+    errRecover: "Try moving a marker closer to a street.",
+    aboutWhat:
+      "Routes through Berlin that stay out of the view of known surveillance " +
+      "cameras — computed on your device, shareable, offline-capable.",
+    aboutHowTitle: "How it works",
+    aboutHow:
+      "Camera positions and directions come from OpenStreetMap. Each camera " +
+      "gets a realistic visibility zone (view cones, blocked by buildings); " +
+      "the router finds paths that minimize the meters inside those zones. " +
+      "The avoidance level sets how much detour you accept.",
+    aboutPrivacyTitle: "Privacy",
+    aboutDataTitle: "Data & limits",
   },
   de: {
-    subtitle:
-      "Routen, die bekannten Überwachungskameras ausweichen.<br />Tippe auf die Karte für Start und Ziel.",
     walk: "🚶 zu Fuß",
     bike: "🚲 Rad",
     clear: "✕ löschen",
@@ -94,17 +104,17 @@ const STR = {
     routing: "Berechne Route …",
     alreadyMinimal: "Der kürzeste Weg ist bei dieser Einstellung bereits kamera-minimal.",
     detour: (extra, seenFrom, seenTo) =>
-      `+${extra} Umweg: im Kamerablick ${seenFrom} → ${seenTo}.`,
-    detourUnseen: (extra) => `+${extra} Umweg — außerhalb aller bekannten Kamerablicke.`,
-    offSeen: (m) => `Kürzester Weg — ${m} im Kamerablick (rote Abschnitte).`,
-    offNone: "Kürzester Weg — außerhalb aller bekannten Kamerablicke.",
+      `+${extra} Umweg<br>im Kamerablick <span class="hero-bad">${seenFrom}</span> → <span class="hero-good">${seenTo}</span>`,
+    detourUnseen: (extra) =>
+      `+${extra} Umweg — <span class="good">außerhalb aller bekannten Kamerablicke.</span>`,
+    offSeen: (m) => `Kürzester Weg — <span class="hero-bad">${m}</span> im Kamerablick (rote Abschnitte).`,
+    offNone: 'Kürzester Weg — <span class="good">außerhalb aller bekannten Kamerablicke.</span>',
     popupCamera: "Kamera",
     noCamData: "keine Kameradaten auf dem Server",
     phStart: "Startadresse …",
     phDest: "Zieladresse …",
     searching: "Suche …",
     noResults: "Keine Treffer in Berlin.",
-    offlineProgress: (pct) => `Offline-Routing: lade ${pct} %`,
     offlineReady: "Offline-Routing aktiv — Routen werden auf diesem Gerät berechnet.",
     engineLocal: (ms) => `⚡ auf diesem Gerät berechnet (${ms} ms)`,
     engineServer: (ms) => `auf dem Server berechnet (${ms} ms)`,
@@ -119,6 +129,20 @@ const STR = {
     linkCopied: "Routen-Link in die Zwischenablage kopiert.",
     gpxName: (profile) => `kamerafrei ${profile === "walk" ? "Fußweg" : "Radweg"}`,
     heatmap: "Kamera-Heatmap",
+    tagline: "Routen, die bekannten Überwachungskameras ausweichen.",
+    known: "nur bekannte Kameras ⓘ",
+    errRecover: "Setze einen Marker näher an eine Straße.",
+    aboutWhat:
+      "Routen durch Berlin, die dem Blick bekannter Überwachungskameras " +
+      "ausweichen — berechnet auf deinem Gerät, teilbar, offline-fähig.",
+    aboutHowTitle: "So funktioniert es",
+    aboutHow:
+      "Kamerapositionen und -richtungen stammen aus OpenStreetMap. Jede Kamera " +
+      "erhält eine realistische Sichtzone (Sichtkegel, durch Gebäude verdeckt); " +
+      "der Router minimiert die Meter innerhalb dieser Zonen. Der Regler " +
+      "bestimmt, wie viel Umweg du akzeptierst.",
+    aboutPrivacyTitle: "Privatsphäre",
+    aboutDataTitle: "Daten & Grenzen",
   },
 }[LANG];
 
@@ -143,6 +167,23 @@ function viewFromHash() {
 const initialView = viewFromHash() || { zoom: 14, center: [52.503, 13.424] };
 const map = L.map("map", { zoomControl: false }).setView(initialView.center, initialView.zoom);
 L.control.zoom({ position: "bottomright" }).addTo(map);
+
+// heatmap toggle as a map control (checkbox #heat-toggle lives inside)
+const HeatControl = L.Control.extend({
+  options: { position: "bottomright" },
+  onAdd() {
+    const label = L.DomUtil.create("label", "map-btn heat-ctl");
+    label.title = STR.heatmap;
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.id = "heat-toggle";
+    label.appendChild(input);
+    label.appendChild(document.createTextNode("🔥"));
+    L.DomEvent.disableClickPropagation(label);
+    return label;
+  },
+});
+map.addControl(new HeatControl());
 
 map.on("moveend", () => {
   const c = map.getCenter();
@@ -200,12 +241,13 @@ function stopLocate() {
 }
 
 function toggleLocate() {
-  if (!("geolocation" in navigator)) return setStatus(STR.geoError, true);
+  if (!("geolocation" in navigator)) return toast(STR.geoError, { error: true });
   if (geoWatchId === null) {
     followMe = true;
+    document.getElementById("results").classList.remove("open"); // peek while walking
     geoWatchId = navigator.geolocation.watchPosition(onPosition, (err) => {
       console.warn("geolocation:", err.message);
-      setStatus(STR.geoError, true);
+      toast(STR.geoError, { error: true });
       stopLocate();
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
   } else if (!followMe) {
@@ -221,8 +263,8 @@ function toggleLocate() {
 const LocateControl = L.Control.extend({
   options: { position: "bottomright" },
   onAdd() {
-    const div = L.DomUtil.create("div", "leaflet-bar");
-    locateBtn = L.DomUtil.create("a", "locate-btn", div);
+    const div = L.DomUtil.create("div");
+    locateBtn = L.DomUtil.create("a", "map-btn locate-btn", div);
     locateBtn.href = "#";
     locateBtn.title = STR.locate;
     locateBtn.setAttribute("aria-label", STR.locate);
@@ -242,20 +284,81 @@ map.on("dragstart", () => {
     followMe = false;
     updateLocateBtn();
   }
+  if (MQ_MOBILE.matches) document.getElementById("results").classList.remove("open");
 });
 
-// params live in a collapsible panel; phones start collapsed so the map wins
-const panel = document.getElementById("panel");
+/* ---------------- UI chrome: query card, sheet, about, toast ------------- */
+
+const MQ_MOBILE = window.matchMedia("(max-width: 640px)");
+const queryCard = document.getElementById("query-card");
 const panelToggle = document.getElementById("panel-toggle");
-if (window.matchMedia("(max-width: 640px)").matches) {
-  panel.classList.add("collapsed");
-  panelToggle.setAttribute("aria-expanded", "false");
+
+function updateChip() {
+  const collapsed = queryCard.classList.contains("collapsed");
+  const show = collapsed && markerA && markerB;
+  const a = document.getElementById("search-a").value.split(",")[0].trim() || "A";
+  const b = document.getElementById("search-b").value.split(",")[0].trim() || "B";
+  document.getElementById("chip-summary").textContent = `${a} → ${b}`;
+  document.getElementById("chip-summary").hidden = !show;
+  document.getElementById("chip-clear").hidden = !show;
 }
-// the whole header row (title included) toggles, not just the chevron
-document.getElementById("panel-header").addEventListener("click", () => {
-  const collapsed = panel.classList.toggle("collapsed");
+
+function setQueryCollapsed(collapsed) {
+  queryCard.classList.toggle("collapsed", collapsed);
   panelToggle.setAttribute("aria-expanded", String(!collapsed));
+  updateChip();
+}
+
+panelToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  setQueryCollapsed(!queryCard.classList.contains("collapsed"));
 });
+document.getElementById("query-header").addEventListener("click", (e) => {
+  if (e.target.id === "chip-clear" || e.target.id === "about-btn") return;
+  if (queryCard.classList.contains("collapsed")) setQueryCollapsed(false);
+});
+document.getElementById("chip-clear").addEventListener("click", () => {
+  document.getElementById("clear").click();
+});
+
+// about modal
+const aboutEl = document.getElementById("about");
+const openAbout = () => (aboutEl.hidden = false);
+const closeAbout = () => {
+  aboutEl.hidden = true;
+  document.getElementById("about-btn").focus();
+};
+document.getElementById("about-btn").addEventListener("click", openAbout);
+document.getElementById("known-note").addEventListener("click", openAbout);
+document.getElementById("about-close").addEventListener("click", closeAbout);
+document.getElementById("about-backdrop").addEventListener("click", closeAbout);
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !aboutEl.hidden) closeAbout();
+});
+
+// results bottom sheet (mobile detents: peek <-> open)
+const sheetHandle = document.getElementById("sheet-handle");
+let sheetDragY = null;
+sheetHandle.addEventListener("click", () => {
+  const open = document.getElementById("results").classList.toggle("open");
+  sheetHandle.setAttribute("aria-expanded", String(open));
+});
+sheetHandle.addEventListener("pointerdown", (e) => {
+  sheetDragY = e.clientY;
+  sheetHandle.setPointerCapture(e.pointerId);
+});
+sheetHandle.addEventListener("pointerup", (e) => {
+  if (sheetDragY === null) return;
+  const dy = e.clientY - sheetDragY;
+  sheetDragY = null;
+  const el = document.getElementById("results");
+  if (dy < -20) el.classList.add("open");
+  else if (dy > 20) el.classList.remove("open");
+});
+
+try {
+  if (localStorage.getItem("kf-routed")) document.getElementById("tagline").hidden = true;
+} catch { /* private mode */ }
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19,
@@ -270,6 +373,8 @@ const statusEl = document.getElementById("status");
 const statsEl = document.getElementById("stats");
 const alphaEl = document.getElementById("alpha");
 const alphaValueEl = document.getElementById("alpha-value");
+const resultsEl = document.getElementById("results");
+const hintEl = document.getElementById("hint");
 
 // slider stops: how far out of your way to go to stay out of camera view
 const AVOIDANCE = [
@@ -295,9 +400,39 @@ let markerA = null;
 let markerB = null;
 let requestSeq = 0;
 
+/* message router: verdicts -> results card, hints -> query card,
+   transient -> toast, download -> progress bar */
 function setStatus(text, isError = false) {
-  statusEl.textContent = text;
   statusEl.classList.toggle("error", isError);
+  if (isError) statusEl.textContent = `${text} ${STR.errRecover}`;
+  else statusEl.innerHTML = text;
+  resultsEl.hidden = false;
+}
+
+function setHint(text, isError = false) {
+  hintEl.textContent = text;
+  hintEl.classList.toggle("error", isError);
+}
+
+let toastTimer = null;
+function toast(text, opts = {}) {
+  const el = document.getElementById("toast");
+  clearTimeout(toastTimer);
+  el.textContent = text;
+  el.classList.toggle("error", !!opts.error);
+  el.classList.remove("fading");
+  el.hidden = false;
+  toastTimer = setTimeout(() => {
+    el.classList.add("fading");
+    toastTimer = setTimeout(() => (el.hidden = true), 200);
+  }, opts.ms || 3000);
+}
+
+function setProgress(pct) {
+  const wrap = document.getElementById("progress");
+  if (pct == null) return void (wrap.hidden = true);
+  wrap.hidden = false;
+  document.getElementById("progress-bar").style.width = `${pct}%`;
 }
 
 /* ---------------- cameras ---------------- */
@@ -366,7 +501,7 @@ fetch("/api/cameras")
         }).bindPopup(cameraPopup(feat.properties)),
     }).addTo(cameraLayer);
     // don't clobber an already-displayed route summary
-    if (!lastRendered) setStatus(STR.camsLoaded(geojson.features.length));
+    setHint(STR.camsLoaded(geojson.features.length));
 
     cameraLatLngs = geojson.features.map((f) => [
       f.geometry.coordinates[1],
@@ -390,7 +525,7 @@ fetch("/api/cameras")
     }
 
   })
-  .catch((err) => setStatus(err.message, true));
+  .catch((err) => setHint(err.message, true));
 
 /* ---------------- camera density heatmap ---------------------------------- */
 
@@ -442,7 +577,7 @@ function setPoint(which, latlng) {
     markerB.on("dragend", requestRoute);
   }
   if (markerA && markerB) requestRoute();
-  else setStatus(markerA ? STR.setDest : STR.setStart);
+  else setHint(markerA ? STR.setDest : STR.setStart);
 }
 
 map.on("click", (e) => setPoint(!markerA ? "a" : "b", e.latlng));
@@ -454,11 +589,14 @@ document.getElementById("clear").addEventListener("click", () => {
   routeLayer.clearLayers();
   statsEl.hidden = true;
   lastRendered = null;
+  resultsEl.hidden = true;
+  resultsEl.classList.remove("open");
   document.getElementById("route-actions").hidden = true;
   document.getElementById("engine-note").hidden = true;
   document.getElementById("search-a").value = "";
   document.getElementById("search-b").value = "";
-  setStatus(STR.setStart);
+  setQueryCollapsed(false);
+  setHint(STR.setStart);
 });
 
 /* ---------------- share & GPX export ------------------------------------- */
@@ -473,18 +611,8 @@ function routeUrl() {
   return `${location.origin}/${hash}`;
 }
 
-let shareNoteTimer = null;
-
 function showShareNote(text, ms = 3000) {
-  const note = document.getElementById("share-note");
-  clearTimeout(shareNoteTimer);
-  note.textContent = text;
-  note.classList.remove("fading");
-  note.hidden = false;
-  shareNoteTimer = setTimeout(() => {
-    note.classList.add("fading");
-    shareNoteTimer = setTimeout(() => (note.hidden = true), 400);
-  }, ms);
+  toast(text, { ms });
 }
 
 // navigator.share/clipboard exist only in secure contexts (https/localhost);
@@ -679,24 +807,24 @@ const pendingLocal = new Map(); // id -> {resolve, reject}
 let worker = null;
 let localMsgId = 0;
 
-function statusIsIdle() {
-  return !(markerA && markerB);
-}
-
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=19", { type: "module" });
+    worker = new Worker("worker.js?v=20", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
         console.log("[worker]", m.type, m.message || m.profile || "");
-      if (m.type === "progress" && m.total && statusIsIdle()) {
-        setStatus(STR.offlineProgress(Math.round((100 * m.loaded) / m.total)));
+      if (m.type === "progress") {
+        setProgress(m.total ? Math.round((100 * m.loaded) / m.total) : 66);
       } else if (m.type === "ready") {
         localReady[m.profile] = true;
-        if (statusIsIdle()) setStatus(STR.offlineReady);
-        else requestRoute(); // upgrade the visible route to the local engine
+        setProgress(null);
+        if (!toast.offlineShown) {
+          toast.offlineShown = true;
+          toast(STR.offlineReady);
+        }
+        if (markerA && markerB) requestRoute(); // upgrade to the local engine
       } else if (m.type === "result") {
         pendingLocal.get(m.id)?.resolve(m.data);
         pendingLocal.delete(m.id);
@@ -713,7 +841,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=19`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=20`,
     camerasUrl: "/api/cameras",
   });
 }
@@ -760,7 +888,7 @@ function requestRoute() {
   });
 
   const seq = ++requestSeq;
-  setStatus(STR.routing);
+  setHint(STR.routing);
 
   const remote = () =>
     fetch(`/api/route?${params}`).then(async (r) => {
@@ -789,10 +917,24 @@ function requestRoute() {
 }
 
 let lastRendered = null; // for share/GPX
+let hadRoute = false;
 
 function render(data) {
   lastRendered = data;
   document.getElementById("route-actions").hidden = false;
+  resultsEl.hidden = false;
+  if (MQ_MOBILE.matches) {
+    if (!hadRoute) resultsEl.classList.add("open");
+    setQueryCollapsed(true);
+  }
+  if (!hadRoute) {
+    hadRoute = true;
+    document.getElementById("tagline").hidden = true;
+    try {
+      localStorage.setItem("kf-routed", "1");
+    } catch { /* private mode */ }
+  }
+  setHint("");
   document.body.dataset.engine = data.engine || "server";
   const engineNote = document.getElementById("engine-note");
   if (data.took_ms != null) {
@@ -847,7 +989,12 @@ function render(data) {
     );
   }
 
-  map.fitBounds(routeLayer.getBounds().pad(0.15));
+  map.fitBounds(
+    routeLayer.getBounds(),
+    MQ_MOBILE.matches
+      ? { paddingTopLeft: L.point(12, 72), paddingBottomRight: L.point(12, 112) }
+      : { paddingTopLeft: L.point(416, 16), paddingBottomRight: L.point(16, 16) }
+  );
 }
 
 function fillStats(s, a) {
