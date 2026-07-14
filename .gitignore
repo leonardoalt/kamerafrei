@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .venv/
+data
 data/
 cache/
 *.egg-info/
