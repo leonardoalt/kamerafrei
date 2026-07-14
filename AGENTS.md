@@ -29,13 +29,12 @@ Slider "max" = α 1000 (a real never-be-seen mode). Routing minimizes
 
     cost(edge) = length + α · exposure
 
-NOTE: the *display* stats (exposed meters, cameras passed, red segments in
-the UI, computed by backend CameraIndex / worker analyzeExposure) still use
-plain 25 m discs — "how close do I pass" — while routing uses the realistic
-zones. Keep that distinction in mind when numbers differ.
+NOTE: "in camera view" meters and red segments follow the routing model
+(per-edge exposure + exposure_ivals) in BOTH engines; only the "cameras
+nearby" count is proximity-based (25 m discs, CameraIndex/analyzeExposure).
 
 - α is the UI's "avoid cameras" control; the worded stops off / a little /
-  a lot / max map to α = 0 / 5 / 15 / 60 (`AVOIDANCE` in `frontend/app.js`).
+  a lot / max map to α = 0 / 5 / 15 / 1000 (`AVOIDANCE` in `frontend/app.js`).
 - **Penalty, not hard no-go zones** — deliberate: near stations/plazas every
   path is covered and hard avoidance would make destinations unreachable.
   A penalty always returns a route and reports residual exposure honestly.
