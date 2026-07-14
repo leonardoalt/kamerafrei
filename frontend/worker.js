@@ -2,7 +2,7 @@
  * client-side. Response shape mirrors /api/route so the UI can't tell
  * whether the server or this worker answered. */
 
-import { parseGraph, nearestNode, route, routeCoords, edgeCoords } from "./router.js?v=21";
+import { parseGraph, nearestNode, route, routeCoords, edgeCoords } from "./router.js?v=22";
 
 const SPEED_KMH = { walk: 4.8, bike: 15.0 };
 

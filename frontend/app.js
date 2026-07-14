@@ -356,6 +356,14 @@ sheetHandle.addEventListener("pointerup", (e) => {
   else if (dy > 20) el.classList.remove("open");
 });
 
+// at peek, the visible verdict is the natural tap target — expand on tap
+document.getElementById("results").addEventListener("click", function (e) {
+  if (!MQ_MOBILE.matches || this.classList.contains("open")) return;
+  if (e.target.closest("#sheet-handle")) return; // handle has its own toggle
+  this.classList.add("open");
+  sheetHandle.setAttribute("aria-expanded", "true");
+});
+
 try {
   if (localStorage.getItem("kf-routed")) document.getElementById("tagline").hidden = true;
 } catch { /* private mode */ }
@@ -580,7 +588,14 @@ function setPoint(which, latlng) {
   else setHint(markerA ? STR.setDest : STR.setStart);
 }
 
-map.on("click", (e) => setPoint(!markerA ? "a" : "b", e.latlng));
+map.on("click", (e) => {
+  const sheet = document.getElementById("results");
+  if (MQ_MOBILE.matches && !sheet.hidden && sheet.classList.contains("open")) {
+    sheet.classList.remove("open"); // first tap only dismisses the sheet
+    return;
+  }
+  setPoint(!markerA ? "a" : "b", e.latlng);
+});
 
 document.getElementById("clear").addEventListener("click", () => {
   if (markerA) map.removeLayer(markerA);
@@ -811,7 +826,7 @@ let localMsgId = 0;
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=21", { type: "module" });
+    worker = new Worker("worker.js?v=22", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -842,7 +857,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=21`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=22`,
     camerasUrl: "/api/cameras",
   });
 }
