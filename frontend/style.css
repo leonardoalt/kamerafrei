@@ -481,8 +481,8 @@ button { font-family: inherit; }
 
   #status { margin-top: 2px; }
 
-  /* keep leaflet chrome above the sheet peek */
-  .leaflet-bottom { bottom: 100px; }
+  /* lift leaflet chrome + toast above the sheet peek — only while routed */
+  body.routed .leaflet-bottom { bottom: 100px; }
 
-  #toast { bottom: 116px; }
+  body.routed #toast { bottom: 116px; }
 }

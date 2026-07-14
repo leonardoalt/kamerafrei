@@ -591,6 +591,7 @@ document.getElementById("clear").addEventListener("click", () => {
   lastRendered = null;
   resultsEl.hidden = true;
   resultsEl.classList.remove("open");
+  document.body.classList.remove("routed");
   document.getElementById("route-actions").hidden = true;
   document.getElementById("engine-note").hidden = true;
   document.getElementById("search-a").value = "";
@@ -810,7 +811,7 @@ let localMsgId = 0;
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=20", { type: "module" });
+    worker = new Worker("worker.js?v=21", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -841,7 +842,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=20`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=21`,
     camerasUrl: "/api/cameras",
   });
 }
@@ -923,6 +924,7 @@ function render(data) {
   lastRendered = data;
   document.getElementById("route-actions").hidden = false;
   resultsEl.hidden = false;
+  document.body.classList.add("routed");
   if (MQ_MOBILE.matches) {
     if (!hadRoute) resultsEl.classList.add("open");
     setQueryCollapsed(true);
