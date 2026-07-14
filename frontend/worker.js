@@ -2,11 +2,12 @@
  * client-side. Response shape mirrors /api/route so the UI can't tell
  * whether the server or this worker answered. */
 
-import { parseGraph, nearestNode, route, routeCoords } from "./router.js?v=13";
+import { parseGraph, nearestNode, route, routeCoords } from "./router.js?v=14";
 
 const SPEED_KMH = { walk: 4.8, bike: 15.0 };
 
 const graphs = {}; // profile -> parsed graph
+const loading = {}; // profile -> in-flight load promise (dedupes double init)
 let cameras = null; // { lat: Float64Array, lon: Float64Array, grid, cell }
 
 /* ---------------- camera exposure (display stats) ------------------------- */
@@ -184,8 +185,16 @@ onmessage = async (e) => {
         const geojson = await (await fetch(msg.camerasUrl)).json();
         cameras = buildCameras(geojson, Math.cos((52.52 * Math.PI) / 180));
       }
-      if (!graphs[msg.profile]) await loadGraph(msg.profile, msg.graphUrl);
-      else postMessage({ type: "ready", profile: msg.profile });
+      if (graphs[msg.profile]) {
+        postMessage({ type: "ready", profile: msg.profile });
+      } else {
+        if (!loading[msg.profile])
+          loading[msg.profile] = loadGraph(msg.profile, msg.graphUrl).catch((err) => {
+            delete loading[msg.profile]; // allow a retry on the next init
+            throw err;
+          });
+        await loading[msg.profile];
+      }
     } else if (msg.type === "route") {
       const g = graphs[msg.profile];
       if (!g) throw new Error(`graph ${msg.profile} not loaded`);

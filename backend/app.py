@@ -105,7 +105,7 @@ def route(
 # binary graphs for the in-browser router (produced by pipeline/export_web.py).
 # Serves the pre-gzipped twin when the client accepts it; X-Raw-Size lets the
 # download progress bar track decompressed bytes.
-@app.get("/web-data/{filename}")
+@app.api_route("/web-data/{filename}", methods=["GET", "HEAD"])
 def web_data(filename: str, request: Request):
     if "/" in filename or "\\" in filename or ".." in filename:
         raise HTTPException(404)

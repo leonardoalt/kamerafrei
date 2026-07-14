@@ -361,8 +361,9 @@ fetch("/api/cameras")
           fillOpacity: 0.6,
         }).bindPopup(cameraPopup(feat.properties)),
     }).addTo(cameraLayer);
+    // don't clobber an already-displayed route summary
+    if (!lastRendered) setStatus(STR.camsLoaded(geojson.features.length));
 
-    // view cones for cameras with a tagged direction (domes see 360°, skip)
     for (const feat of geojson.features) {
       const props = feat.properties;
       if (props["camera:type"] === "dome") continue;
@@ -378,7 +379,6 @@ fetch("/api/cameras")
       }
     }
 
-    setStatus(STR.camsLoaded(geojson.features.length));
   })
   .catch((err) => setStatus(err.message, true));
 
@@ -604,9 +604,11 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=13", { type: "module" });
+    worker = new Worker("worker.js?v=14", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
+      if (m.type === "ready" || m.type === "error" || m.type === "routeError")
+        console.log("[worker]", m.type, m.message || m.profile || "");
       if (m.type === "progress" && m.total && statusIsIdle()) {
         setStatus(STR.offlineProgress(Math.round((100 * m.loaded) / m.total)));
       } else if (m.type === "ready") {
@@ -629,7 +631,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=13`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=14`,
     camerasUrl: "/api/cameras",
   });
 }
