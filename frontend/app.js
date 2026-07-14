@@ -440,7 +440,7 @@ function setProgress(pct) {
   const wrap = document.getElementById("progress");
   if (pct == null) return void (wrap.hidden = true);
   wrap.hidden = false;
-  document.getElementById("progress-bar").style.width = `${pct}%`;
+  document.getElementById("progress-bar").style.width = `${Math.min(100, pct)}%`;
 }
 
 /* ---------------- cameras ---------------- */
@@ -458,7 +458,7 @@ function cameraPopup(props) {
 
 // visibility zones (cones AND discs, building-clipped) — the actual shapes
 // the router avoids, exported by pipeline/export_zones.py
-fetch("/web-data/zones.geojson?v=23")
+fetch("/web-data/zones.geojson?v=24")
   .then((r) => (r.ok ? r.json() : null))
   .then((zones) => {
     if (!zones) return; // zones not exported yet: dots only
@@ -794,7 +794,7 @@ let localMsgId = 0;
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=23", { type: "module" });
+    worker = new Worker("worker.js?v=24", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -825,7 +825,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=23`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=24`,
     camerasUrl: "/api/cameras",
   });
 }

@@ -192,11 +192,27 @@ button { font-family: inherit; }
 #hint.error { color: var(--exposure); }
 
 #progress {
-  height: 2px;
+  position: relative;
+  height: 3px;
   margin: 10px -16px -16px;
   border-radius: 0 0 14px 14px;
   overflow: hidden;
   background: var(--line);
+}
+
+/* browsers that buffer SW-piped downloads deliver no incremental chunks;
+   the shimmer shows life even when the fill can't move */
+#progress::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(20, 83, 45, 0.35), transparent);
+  animation: prog-slide 1.2s linear infinite;
+}
+
+@keyframes prog-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 #progress-bar {
