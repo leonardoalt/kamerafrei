@@ -224,6 +224,17 @@ html, body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.4);
 }
 
+.locate-btn {
+  font-size: 20px;
+  line-height: 26px;
+  text-align: center;
+  color: #333;
+  text-decoration: none;
+}
+
+.locate-btn.following { background: #2563eb; color: #fff; }
+.locate-btn.watching { color: #2563eb; }
+
 .marker-pin span { transform: rotate(45deg); }
 .marker-a { background: #16a34a; }
 .marker-b { background: #dc2626; }

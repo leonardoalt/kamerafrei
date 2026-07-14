@@ -54,6 +54,8 @@ const STR = {
       "<strong>Privacy:</strong> routes are computed on your device whenever " +
       "possible; the server fallback stores nothing and keeps no logs. " +
       "No accounts, no tracking.",
+    locate: "Show my location",
+    geoError: "Location unavailable — check the browser permission.",
   },
   de: {
     subtitle:
@@ -103,6 +105,8 @@ const STR = {
       "<strong>Privatsphäre:</strong> Routen werden wenn möglich auf deinem " +
       "Gerät berechnet; der Server-Fallback speichert nichts und führt keine " +
       "Logs. Keine Konten, kein Tracking.",
+    locate: "Meinen Standort zeigen",
+    geoError: "Standort nicht verfügbar — Browser-Berechtigung prüfen.",
   },
 }[LANG];
 
@@ -131,6 +135,101 @@ L.control.zoom({ position: "bottomright" }).addTo(map);
 map.on("moveend", () => {
   const c = map.getCenter();
   history.replaceState(null, "", `#map=${map.getZoom()}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`);
+});
+
+/* ---------------- live position ("follow me" while walking) -------------- */
+
+let geoWatchId = null;
+let followMe = false;
+let posMarker = null;
+let accCircle = null;
+let locateBtn = null;
+
+function updateLocateBtn() {
+  locateBtn.classList.toggle("following", followMe);
+  locateBtn.classList.toggle("watching", geoWatchId !== null && !followMe);
+}
+
+function onPosition(pos) {
+  const latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+  if (!posMarker) {
+    accCircle = L.circle(latlng, {
+      radius: pos.coords.accuracy,
+      color: "#2563eb",
+      weight: 1,
+      opacity: 0.4,
+      fillColor: "#2563eb",
+      fillOpacity: 0.1,
+      interactive: false,
+    }).addTo(map);
+    posMarker = L.circleMarker(latlng, {
+      radius: 7,
+      color: "#fff",
+      weight: 3,
+      fillColor: "#2563eb",
+      fillOpacity: 1,
+      interactive: false,
+    }).addTo(map);
+  } else {
+    posMarker.setLatLng(latlng);
+    accCircle.setLatLng(latlng).setRadius(pos.coords.accuracy);
+  }
+  if (followMe) map.setView(latlng, Math.max(map.getZoom(), 16));
+}
+
+function stopLocate() {
+  if (geoWatchId !== null) navigator.geolocation.clearWatch(geoWatchId);
+  geoWatchId = null;
+  followMe = false;
+  if (posMarker) map.removeLayer(posMarker);
+  if (accCircle) map.removeLayer(accCircle);
+  posMarker = accCircle = null;
+  updateLocateBtn();
+}
+
+function toggleLocate() {
+  if (!("geolocation" in navigator)) return setStatus(STR.geoError, true);
+  if (geoWatchId === null) {
+    followMe = true;
+    geoWatchId = navigator.geolocation.watchPosition(onPosition, (err) => {
+      console.warn("geolocation:", err.message);
+      setStatus(STR.geoError, true);
+      stopLocate();
+    }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+  } else if (!followMe) {
+    followMe = true; // re-center and resume following
+    if (posMarker) map.setView(posMarker.getLatLng(), Math.max(map.getZoom(), 16));
+  } else {
+    stopLocate();
+    return;
+  }
+  updateLocateBtn();
+}
+
+const LocateControl = L.Control.extend({
+  options: { position: "bottomright" },
+  onAdd() {
+    const div = L.DomUtil.create("div", "leaflet-bar");
+    locateBtn = L.DomUtil.create("a", "locate-btn", div);
+    locateBtn.href = "#";
+    locateBtn.title = STR.locate;
+    locateBtn.setAttribute("aria-label", STR.locate);
+    locateBtn.textContent = "⌖";
+    L.DomEvent.on(locateBtn, "click", (e) => {
+      L.DomEvent.stop(e);
+      toggleLocate();
+    });
+    return div;
+  },
+});
+map.addControl(new LocateControl());
+
+// panning by hand pauses following (dot stays); tap the button to re-center
+map.on("dragstart", () => {
+  if (followMe) {
+    followMe = false;
+    updateLocateBtn();
+  }
 });
 
 // params live in a collapsible panel; phones start collapsed so the map wins
