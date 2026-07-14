@@ -188,6 +188,8 @@ html, body {
   color: #15803d;
   margin: -4px 0 8px;
   transition: opacity 0.4s;
+  user-select: text; /* may display the raw URL as a manual-copy fallback */
+  word-break: break-all;
 }
 
 #share-note.fading { opacity: 0; }

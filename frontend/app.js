@@ -442,7 +442,7 @@ function routeUrl() {
 
 let shareNoteTimer = null;
 
-function showShareNote(text) {
+function showShareNote(text, ms = 3000) {
   const note = document.getElementById("share-note");
   clearTimeout(shareNoteTimer);
   note.textContent = text;
@@ -451,7 +451,35 @@ function showShareNote(text) {
   shareNoteTimer = setTimeout(() => {
     note.classList.add("fading");
     shareNoteTimer = setTimeout(() => (note.hidden = true), 400);
-  }, 3000);
+  }, ms);
+}
+
+// navigator.share/clipboard exist only in secure contexts (https/localhost);
+// on plain-http LAN we fall back to execCommand, and failing that show the
+// URL itself so it can be copied by hand
+async function copyText(text) {
+  if (navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* permission denied — try the legacy path */
+    }
+  }
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand("copy");
+  } catch {
+    ok = false;
+  }
+  ta.remove();
+  return ok;
 }
 
 document.getElementById("share-btn").addEventListener("click", async () => {
@@ -465,8 +493,8 @@ document.getElementById("share-btn").addEventListener("click", async () => {
       /* user dismissed the sheet — fall through to clipboard */
     }
   }
-  await navigator.clipboard.writeText(url);
-  showShareNote(STR.linkCopied);
+  if (await copyText(url)) showShareNote(STR.linkCopied);
+  else showShareNote(url, 20000); // leave time to select and copy by hand
 });
 
 document.getElementById("gpx-btn").addEventListener("click", () => {
@@ -620,7 +648,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=16", { type: "module" });
+    worker = new Worker("worker.js?v=17", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -647,7 +675,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=16`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=17`,
     camerasUrl: "/api/cameras",
   });
 }
