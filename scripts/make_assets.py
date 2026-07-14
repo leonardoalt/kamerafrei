@@ -104,20 +104,38 @@ OG_SVG = f"""\
 """
 
 
+# maskable: platforms crop up to a circle; keep the glyph in the safe zone
+MASKABLE_SVG = """\
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" fill="#14532d"/>
+  <g transform="translate(18,18) scale(1.0)">
+    <g transform="rotate(8 30 27)" fill="#f8fafc">
+      <rect x="11" y="19" width="27" height="14" rx="3"/>
+      <rect x="38" y="22.5" width="7" height="7" rx="1.5"/>
+      <rect x="22" y="33" width="5" height="9" rx="1.5"/>
+      <rect x="15" y="42" width="19" height="5" rx="2.5"/>
+    </g>
+    <line x1="13" y1="51" x2="51" y2="13" stroke="#ef4444" stroke-width="7"
+          stroke-linecap="round"/>
+  </g>
+</svg>
+"""
+
+
 def main():
-    cairosvg.svg2png(
-        url=str(FRONTEND / "favicon.svg"),
-        write_to=str(FRONTEND / "apple-touch-icon.png"),
-        output_width=180,
-        output_height=180,
-    )
-    cairosvg.svg2png(
-        bytestring=OG_SVG.encode(),
-        write_to=str(FRONTEND / "og.png"),
-        output_width=W,
-        output_height=H,
-    )
-    for name in ("apple-touch-icon.png", "og.png"):
+    favicon = str(FRONTEND / "favicon.svg")
+    outputs = [
+        ("apple-touch-icon.png", dict(url=favicon, output_width=180, output_height=180)),
+        ("icon-192.png", dict(url=favicon, output_width=192, output_height=192)),
+        ("icon-512.png", dict(url=favicon, output_width=512, output_height=512)),
+        (
+            "icon-maskable-512.png",
+            dict(bytestring=MASKABLE_SVG.encode(), output_width=512, output_height=512),
+        ),
+        ("og.png", dict(bytestring=OG_SVG.encode(), output_width=W, output_height=H)),
+    ]
+    for name, kwargs in outputs:
+        cairosvg.svg2png(write_to=str(FRONTEND / name), **kwargs)
         print(f"wrote frontend/{name} ({(FRONTEND / name).stat().st_size // 1024} KB)")
 
 

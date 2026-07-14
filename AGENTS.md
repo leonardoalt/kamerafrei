@@ -106,8 +106,12 @@ compute_exposure.py per-edge     routing.py Router (A*,
   Client routing is the DEFAULT (skipped on data-saver connections;
   `?client=0` forces the server for debugging); local failures fall back
   to the server automatically. Static asset URLs carry `?v=N` — bump on
-  every frontend/graph change, or browsers and the edge serve stale code
-  (a cached 404 on an unversioned URL cost us an afternoon).
+  every frontend change in index.html AND sw.js (VERSION const) AND the
+  worker.js router import, or browsers and the edge serve stale code
+  (a cached 404 on an unversioned URL cost us an afternoon). Graph .bin
+  URLs version separately (bump only when data format/content changes).
+  PWA: sw.js precaches the shell; cache-first graphs/tiles,
+  stale-while-revalidate cameras, network-only /api/route.
   uvicorn runs with --no-access-log: the UI promises route coordinates
   are never logged; keep that true.
 - Deploy (see DEPLOY.md): 4 GB VPS + `docker compose --profile prod up -d`
@@ -119,10 +123,10 @@ compute_exposure.py per-edge     routing.py Router (A*,
 
 ## Roadmap (not built yet)
 
-1. Client-side routing — DONE and default; remaining: service worker
-   cache + PWA manifest (offline/installable), then optional static
-   hosting. Consider pre-compressed graph serving (.bin is 21 MB raw,
-   9 MB gzipped; Cloudflare doesn't compress octet-stream).
+1. Client-side routing + PWA — DONE and default (installable, offline
+   after first visit); remaining: optional static hosting. Consider
+   pre-compressed graph serving (.bin is 21 MB raw, 9 MB gzipped;
+   Cloudflare doesn't compress octet-stream).
 2. View-cone exposure model + building shadowing (display cones exist;
    routing exposure still uses 25 m discs).
 3. Other cities (pipeline is city-agnostic — only place/bbox changes).

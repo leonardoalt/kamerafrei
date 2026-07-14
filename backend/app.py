@@ -5,8 +5,11 @@ Data: expects data/graph_{walk,bike}.pkl.gz (from the pipeline) and
       data/cameras.geojson. Profiles whose graph is missing return 503.
 """
 
+import mimetypes
 import time
 from contextlib import asynccontextmanager
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query

@@ -540,7 +540,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=10", { type: "module" });
+    worker = new Worker("worker.js?v=12", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "progress" && m.total && statusIsIdle()) {
@@ -712,4 +712,13 @@ const routeHash = location.hash.match(
 if (routeHash) {
   setPoint("a", L.latLng(+routeHash[1], +routeHash[2]));
   setPoint("b", L.latLng(+routeHash[3], +routeHash[4]));
+}
+
+/* ---------------- PWA ------------------------------------------------------ */
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker
+    .register("/sw.js")
+    .then(() => console.log("sw registered"))
+    .catch((err) => console.warn("sw registration failed:", err));
 }
