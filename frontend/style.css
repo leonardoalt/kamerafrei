@@ -183,6 +183,15 @@ html, body {
   margin: -4px 0 8px;
 }
 
+#share-note {
+  font-size: 12px;
+  color: #15803d;
+  margin: -4px 0 8px;
+  transition: opacity 0.4s;
+}
+
+#share-note.fading { opacity: 0; }
+
 .legend {
   display: flex;
   flex-wrap: wrap;

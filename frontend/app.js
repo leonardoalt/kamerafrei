@@ -440,19 +440,33 @@ function routeUrl() {
   return `${location.origin}/${hash}`;
 }
 
+let shareNoteTimer = null;
+
+function showShareNote(text) {
+  const note = document.getElementById("share-note");
+  clearTimeout(shareNoteTimer);
+  note.textContent = text;
+  note.classList.remove("fading");
+  note.hidden = false;
+  shareNoteTimer = setTimeout(() => {
+    note.classList.add("fading");
+    shareNoteTimer = setTimeout(() => (note.hidden = true), 400);
+  }, 3000);
+}
+
 document.getElementById("share-btn").addEventListener("click", async () => {
   if (!markerA || !markerB) return;
   const url = routeUrl();
   if (navigator.share) {
     try {
       await navigator.share({ title: "kamerafrei", url });
-      return;
+      return; // the OS share sheet is its own feedback
     } catch {
       /* user dismissed the sheet — fall through to clipboard */
     }
   }
   await navigator.clipboard.writeText(url);
-  setStatus(STR.linkCopied);
+  showShareNote(STR.linkCopied);
 });
 
 document.getElementById("gpx-btn").addEventListener("click", () => {
@@ -606,7 +620,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=15", { type: "module" });
+    worker = new Worker("worker.js?v=16", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -633,7 +647,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=15`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=16`,
     camerasUrl: "/api/cameras",
   });
 }
