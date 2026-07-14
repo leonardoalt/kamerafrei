@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -103,12 +103,23 @@ def route(
 
 
 # binary graphs for the in-browser router (produced by pipeline/export_web.py).
-# check_dir=False: serve 404s until the exporter creates the directory, then
-# serve files immediately — no restart-ordering dance.
-app.mount(
-    "/web-data",
-    StaticFiles(directory=DATA_DIR / "web", check_dir=False),
-    name="webdata",
-)
+# Serves the pre-gzipped twin when the client accepts it; X-Raw-Size lets the
+# download progress bar track decompressed bytes.
+@app.get("/web-data/{filename}")
+def web_data(filename: str, request: Request):
+    if "/" in filename or "\\" in filename or ".." in filename:
+        raise HTTPException(404)
+    path = DATA_DIR / "web" / filename
+    gz_path = path.with_suffix(path.suffix + ".gz")
+    if "gzip" in request.headers.get("accept-encoding", "") and gz_path.exists():
+        headers = {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"}
+        if path.exists():
+            headers["X-Raw-Size"] = str(path.stat().st_size)
+        return FileResponse(
+            gz_path, media_type="application/octet-stream", headers=headers
+        )
+    if not path.exists():
+        raise HTTPException(404)
+    return FileResponse(path, media_type="application/octet-stream")
 
 app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

@@ -201,6 +201,14 @@ def main() -> int:
         f"({pruned} dominated parallels dropped, {with_geom} with geometry, "
         f"pool {len(geom_pool) / 1e6:.1f} MB)"
     )
+
+    # pre-compressed twin: served with Content-Encoding gzip (Cloudflare
+    # doesn't compress octet-stream, so we do it once here)
+    gz_path = out_path.with_suffix(out_path.suffix + ".gz")
+    with open(out_path, "rb") as raw, open(gz_path, "wb") as f:
+        with gzip.GzipFile(fileobj=f, mode="wb", compresslevel=9, mtime=0) as gz:
+            gz.write(raw.read())
+    print(f"Wrote {gz_path}: {gz_path.stat().st_size / 1e6:.1f} MB")
     return 0
 
 

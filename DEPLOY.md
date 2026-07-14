@@ -141,6 +141,23 @@ Check: `curl -sI https://kamerafrei.com/web-data/graph_walk.bin | head -1`
 → 200. Without these files the site still works — `?client=1` just falls
 back to server routing.
 
+## 6c. One-time: view-cone exposure model (2026-07-14)
+
+Exposure moved from plain 25 m discs to direction cones clipped by
+building shadows. Data built before that needs a recompute:
+
+```sh
+cd ~/devel/kamerafrei
+docker compose run --build --rm pipeline sh -c "
+  python pipeline/fetch_buildings.py &&
+  python pipeline/compute_exposure.py --graph data/graph_walk.pkl.gz &&
+  python pipeline/compute_exposure.py --graph data/graph_bike.pkl.gz &&
+  python pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin &&
+  python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+"
+docker compose --profile prod up -d --build
+```
+
 ## 7. Weekly camera refresh (cron)
 
 New cameras appear in OSM continuously. This re-fetches them and recomputes

@@ -2,7 +2,7 @@
  * client-side. Response shape mirrors /api/route so the UI can't tell
  * whether the server or this worker answered. */
 
-import { parseGraph, nearestNode, route, routeCoords } from "./router.js?v=12";
+import { parseGraph, nearestNode, route, routeCoords } from "./router.js?v=13";
 
 const SPEED_KMH = { walk: 4.8, bike: 15.0 };
 
@@ -152,7 +152,10 @@ function describe(g, profile, result, alpha) {
 async function loadGraph(profile, url) {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`graph fetch failed: ${resp.status}`);
-  const total = +resp.headers.get("Content-Length") || 0;
+  // X-Raw-Size = decompressed size (body arrives gzip-encoded; the reader
+  // below sees decompressed bytes, so Content-Length would overshoot 100%)
+  const total =
+    +resp.headers.get("X-Raw-Size") || +resp.headers.get("Content-Length") || 0;
   const reader = resp.body.getReader();
   const chunks = [];
   let loaded = 0;

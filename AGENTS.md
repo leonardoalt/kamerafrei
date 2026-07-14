@@ -17,10 +17,18 @@ see DEPLOY.md)
 ## Core model
 
 Every graph edge carries a precomputed `exposure` attribute: meters of the
-edge within **25 m** of a known camera (`exposure_radius_m` stored on the
-graph). Routing minimizes
+edge inside some camera's **visibility zone**. Zones (v2 model): cameras
+with `camera:direction` (and not dome/panning) see a cone (±35°, 40 m);
+everything else a 25 m disc; both are clipped by **building shadows** via
+ray casting against footprints near cameras (pipeline/fetch_buildings.py →
+compute_exposure.py). Routing minimizes
 
     cost(edge) = length + α · exposure
+
+NOTE: the *display* stats (exposed meters, cameras passed, red segments in
+the UI, computed by backend CameraIndex / worker analyzeExposure) still use
+plain 25 m discs — "how close do I pass" — while routing uses the realistic
+zones. Keep that distinction in mind when numbers differ.
 
 - α is the UI's "avoid cameras" control; the worded stops off / a little /
   a lot / max map to α = 0 / 5 / 15 / 60 (`AVOIDANCE` in `frontend/app.js`).
@@ -73,8 +81,9 @@ compute_exposure.py per-edge     routing.py Router (A*,
 - **Camera filter** (`pipeline/fetch_cameras.py`): keep
   `man_made=surveillance` with `surveillance:type` ∈ {camera, ALPR, webcam}
   or untyped; drop `surveillance=indoor`.
-- **MVP visibility model = 25 m disc** per camera. v2: view cones from
-  `camera:direction`/`camera:angle`, building shadowing via footprints.
+- **Visibility model v2 = cones + building shadows** (see Core model).
+  Graph .bin files are also written pre-gzipped (.bin.gz) and served with
+  Content-Encoding gzip + X-Raw-Size (progress bar) by /web-data.
 
 ## Gotchas
 

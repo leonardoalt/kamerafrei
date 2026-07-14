@@ -56,6 +56,10 @@ const STR = {
       "No accounts, no tracking.",
     locate: "Show my location",
     geoError: "Location unavailable — check the browser permission.",
+    share: "📤 share",
+    gpx: "⬇ GPX",
+    linkCopied: "Route link copied to the clipboard.",
+    gpxName: (profile) => `kamerafrei ${profile} route`,
   },
   de: {
     subtitle:
@@ -107,6 +111,10 @@ const STR = {
       "Logs. Keine Konten, kein Tracking.",
     locate: "Meinen Standort zeigen",
     geoError: "Standort nicht verfügbar — Browser-Berechtigung prüfen.",
+    share: "📤 teilen",
+    gpx: "⬇ GPX",
+    linkCopied: "Routen-Link in die Zwischenablage kopiert.",
+    gpxName: (profile) => `kamerafrei ${profile === "walk" ? "Fußweg" : "Radweg"}`,
   },
 }[LANG];
 
@@ -321,7 +329,8 @@ function parseDirections(value) {
     .filter((d) => d !== null);
 }
 
-function coneLatLngs(latlng, bearing, radiusM = 35, halfAngle = 30) {
+// matches the routing model in pipeline/compute_exposure.py (cone 40 m ±35°)
+function coneLatLngs(latlng, bearing, radiusM = 40, halfAngle = 35) {
   const points = [latlng];
   const latScale = 111320;
   const lngScale = 111320 * Math.cos((latlng.lat * Math.PI) / 180);
@@ -409,9 +418,64 @@ document.getElementById("clear").addEventListener("click", () => {
   markerA = markerB = null;
   routeLayer.clearLayers();
   statsEl.hidden = true;
+  lastRendered = null;
+  document.getElementById("route-actions").hidden = true;
+  document.getElementById("engine-note").hidden = true;
   document.getElementById("search-a").value = "";
   document.getElementById("search-b").value = "";
   setStatus(STR.setStart);
+});
+
+/* ---------------- share & GPX export ------------------------------------- */
+
+function routeUrl() {
+  const a = markerA.getLatLng();
+  const b = markerB.getLatLng();
+  const profile = document.querySelector('input[name="profile"]:checked').value;
+  const hash =
+    `#r=${a.lat.toFixed(6)},${a.lng.toFixed(6)},${b.lat.toFixed(6)},${b.lng.toFixed(6)}` +
+    `&p=${profile}&a=${alphaEl.value}`;
+  return `${location.origin}/${hash}`;
+}
+
+document.getElementById("share-btn").addEventListener("click", async () => {
+  if (!markerA || !markerB) return;
+  const url = routeUrl();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "kamerafrei", url });
+      return;
+    } catch {
+      /* user dismissed the sheet — fall through to clipboard */
+    }
+  }
+  await navigator.clipboard.writeText(url);
+  setStatus(STR.linkCopied);
+});
+
+document.getElementById("gpx-btn").addEventListener("click", () => {
+  if (!lastRendered) return;
+  const route = lastRendered.routes[lastRendered.routes.length - 1];
+  const name = STR.gpxName(route.profile);
+  const pts = route.geometry.coordinates
+    .map(([lon, lat]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lon.toFixed(6)}"/>`)
+    .join("\n");
+  const gpx = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="kamerafrei.com" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>${name} — ${(route.distance_m / 1000).toFixed(1)} km, ${route.n_cameras} cameras</name>
+    <trkseg>
+${pts}
+    </trkseg>
+  </trk>
+</gpx>
+`;
+  const blob = new Blob([gpx], { type: "application/gpx+xml" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "kamerafrei-route.gpx";
+  a.click();
+  URL.revokeObjectURL(a.href);
 });
 
 /* ---------------- address autocomplete (Photon by komoot) ---------------- */
@@ -540,7 +604,7 @@ function statusIsIdle() {
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=12", { type: "module" });
+    worker = new Worker("worker.js?v=13", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "progress" && m.total && statusIsIdle()) {
@@ -565,7 +629,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=10`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=13`,
     camerasUrl: "/api/cameras",
   });
 }
@@ -640,7 +704,11 @@ function requestRoute() {
     });
 }
 
+let lastRendered = null; // for share/GPX
+
 function render(data) {
+  lastRendered = data;
+  document.getElementById("route-actions").hidden = false;
   document.body.dataset.engine = data.engine || "server";
   const engineNote = document.getElementById("engine-note");
   if (data.took_ms != null) {
@@ -710,6 +778,15 @@ const routeHash = location.hash.match(
   /(?:^#|&)r=(-?[\d.]+),(-?[\d.]+),(-?[\d.]+),(-?[\d.]+)/
 );
 if (routeHash) {
+  const profileHash = location.hash.match(/(?:^#|&)p=(walk|bike)/);
+  if (profileHash) {
+    document.querySelector(`input[name="profile"][value="${profileHash[1]}"]`).checked = true;
+  }
+  const alphaHash = location.hash.match(/(?:^#|&)a=([0-3])/);
+  if (alphaHash) {
+    alphaEl.value = alphaHash[1];
+    updateAlphaLabel();
+  }
   setPoint("a", L.latLng(+routeHash[1], +routeHash[2]));
   setPoint("b", L.latLng(+routeHash[3], +routeHash[4]));
 }

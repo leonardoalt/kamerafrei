@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Annotate every graph edge with its surveillance exposure.
 
-For each edge, exposure is the number of meters of the edge geometry that
-lie within `radius` meters of any known camera (MVP visibility model:
-a disc per camera; view cones come later). The router then minimizes
+Visibility model (v2):
+- cameras with a tagged `camera:direction` (and not dome/panning) see a
+  CONE: bearing ± CONE_HALF_ANGLE°, up to --cone-radius meters
+- all other cameras see a full disc of --radius meters
+- both are clipped by BUILDING SHADOWS: rays stop at the first building
+  wall (data/buildings.geojson from pipeline/fetch_buildings.py); without
+  that file, zones are unclipped (v1 behavior, with a warning)
 
-    cost(edge) = length + alpha * exposure
-
-Writes the enriched graph back in place and prints coverage stats.
+exposure(edge) = meters of the edge inside the union of visibility zones.
+The router then minimizes cost = length + alpha * exposure.
 
 Usage:
     python pipeline/compute_exposure.py --graph data/graph_walk.pkl.gz
@@ -16,28 +19,162 @@ Usage:
 import argparse
 import gzip
 import json
+import math
 import pickle
 import sys
 from pathlib import Path
 
+import numpy as np
 from pyproj import Transformer
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString, Point, Polygon
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
+from shapely.validation import make_valid
 
 DEFAULT_RADIUS = 25.0
+DEFAULT_CONE_RADIUS = 40.0
+CONE_HALF_ANGLE = 35.0
+RAY_STEP_DEG = 3.0
+WALL_CLEARANCE_M = 2.0  # cameras are mounted on walls; ignore hits this close
+
+CARDINALS = {
+    "N": 0.0, "NNE": 22.5, "NE": 45.0, "ENE": 67.5, "E": 90.0, "ESE": 112.5,
+    "SE": 135.0, "SSE": 157.5, "S": 180.0, "SSW": 202.5, "SW": 225.0,
+    "WSW": 247.5, "W": 270.0, "WNW": 292.5, "NW": 315.0, "NNW": 337.5,
+}
+
+OMNI_TYPES = {"dome", "panning"}  # rotate/see all around: treat as disc
 
 
-def load_cameras(path: Path, crs) -> tuple[list[Point], list[str]]:
+def parse_directions(value):
+    if value is None:
+        return []
+    out = []
+    for part in str(value).split(";"):
+        part = part.strip().upper()
+        if part in CARDINALS:
+            out.append(CARDINALS[part])
+        else:
+            try:
+                out.append(float(part) % 360.0)
+            except ValueError:
+                pass  # ranges like "45-90" fall back to a disc
+    return out
+
+
+def load_cameras(path: Path, crs):
     collection = json.loads(path.read_text())
     transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
-    points, ids = [], []
+    cams = []
     for feat in collection["features"]:
         lon, lat = feat["geometry"]["coordinates"]
         x, y = transformer.transform(lon, lat)
-        points.append(Point(x, y))
-        ids.append(feat["properties"].get("osm_id", "?"))
-    return points, ids
+        props = feat["properties"]
+        cams.append(
+            {
+                "x": x,
+                "y": y,
+                "id": props.get("osm_id", "?"),
+                "directions": parse_directions(props.get("camera:direction")),
+                "omni": props.get("camera:type") in OMNI_TYPES,
+            }
+        )
+    return cams
+
+
+def load_building_rings(path: Path, crs):
+    """Projected exterior rings as numpy coord arrays + an STRtree over them."""
+    collection = json.loads(path.read_text())
+    transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+    rings, geoms = [], []
+    for feat in collection["features"]:
+        coords = feat["geometry"]["coordinates"][0]
+        xs, ys = transformer.transform([c[0] for c in coords], [c[1] for c in coords])
+        arr = np.column_stack([xs, ys])
+        rings.append(arr)
+        geoms.append(LineString(arr))
+    return rings, (STRtree(geoms) if geoms else None)
+
+
+def ray_distances(cx, cy, bearings_deg, max_r, seg_a, seg_b):
+    """Distance each ray travels before hitting a wall (vectorized).
+
+    bearings are compass degrees (0=N, clockwise); returns array of lengths.
+    """
+    th = np.radians(bearings_deg)
+    d = np.column_stack([np.sin(th), np.cos(th)])  # (M, 2)
+    if seg_a is None or len(seg_a) == 0:
+        return np.full(len(bearings_deg), max_r)
+
+    p = np.array([cx, cy])
+    ap = seg_a - p  # (N, 2)
+    ab = seg_b - seg_a  # (N, 2)
+    cross_ap_ab = ap[:, 0] * ab[:, 1] - ap[:, 1] * ab[:, 0]  # (N,)
+    # denom[m, n] = d_m x ab_n
+    denom = d[:, 0, None] * ab[None, :, 1] - d[:, 1, None] * ab[None, :, 0]
+    # u[m, n] = (ap_n x d_m) / denom
+    cross_ap_d = ap[None, :, 0] * d[:, 1, None] - ap[None, :, 1] * d[:, 0, None]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        t = cross_ap_ab[None, :] / denom
+        u = cross_ap_d / denom
+    valid = (
+        (np.abs(denom) > 1e-12)
+        & (u >= 0.0)
+        & (u <= 1.0)
+        & (t > WALL_CLEARANCE_M)
+        & (t < max_r)
+    )
+    t = np.where(valid, t, max_r)
+    return t.min(axis=1)
+
+
+def visibility_zones(cam, rings, tree, radius, cone_radius):
+    """One or more shapely polygons this camera can see."""
+    directed = cam["directions"] and not cam["omni"]
+    max_r = cone_radius if directed else radius
+
+    seg_a = seg_b = None
+    if tree is not None:
+        probe = Point(cam["x"], cam["y"]).buffer(max_r)
+        idxs = tree.query(probe)
+        if len(idxs):
+            parts_a, parts_b = [], []
+            for i in idxs:
+                arr = rings[i]
+                parts_a.append(arr[:-1])
+                parts_b.append(arr[1:])
+            seg_a = np.vstack(parts_a)
+            seg_b = np.vstack(parts_b)
+
+    zones = []
+    if directed:
+        for bearing in cam["directions"]:
+            angles = np.arange(
+                bearing - CONE_HALF_ANGLE, bearing + CONE_HALF_ANGLE + 0.01, 2.5
+            )
+            dist = ray_distances(cam["x"], cam["y"], angles, cone_radius, seg_a, seg_b)
+            th = np.radians(angles)
+            pts = np.column_stack(
+                [cam["x"] + dist * np.sin(th), cam["y"] + dist * np.cos(th)]
+            )
+            poly = Polygon([(cam["x"], cam["y"]), *map(tuple, pts)])
+            if not poly.is_valid:
+                poly = make_valid(poly)
+            if not poly.is_empty:
+                zones.append(poly)
+    else:
+        angles = np.arange(0.0, 360.0, RAY_STEP_DEG)
+        dist = ray_distances(cam["x"], cam["y"], angles, radius, seg_a, seg_b)
+        th = np.radians(angles)
+        pts = np.column_stack(
+            [cam["x"] + dist * np.sin(th), cam["y"] + dist * np.cos(th)]
+        )
+        poly = Polygon(map(tuple, pts))
+        if not poly.is_valid:
+            poly = make_valid(poly)
+        if not poly.is_empty:
+            zones.append(poly)
+    return zones
 
 
 def edge_geometry(graph, u, v, data) -> LineString:
@@ -53,7 +190,9 @@ def main() -> int:
     data_dir = Path(__file__).resolve().parents[1] / "data"
     parser.add_argument("--graph", default=str(data_dir / "graph_walk.pkl.gz"))
     parser.add_argument("--cameras", default=str(data_dir / "cameras.geojson"))
+    parser.add_argument("--buildings", default=str(data_dir / "buildings.geojson"))
     parser.add_argument("--radius", type=float, default=DEFAULT_RADIUS)
+    parser.add_argument("--cone-radius", type=float, default=DEFAULT_CONE_RADIUS)
     args = parser.parse_args()
 
     graph_path = Path(args.graph)
@@ -62,10 +201,30 @@ def main() -> int:
         graph = pickle.load(f)
     crs = graph.graph["crs"]
 
-    points, ids = load_cameras(Path(args.cameras), crs)
-    print(f"Loaded {len(points)} cameras; buffering discs of {args.radius} m")
-    discs = [p.buffer(args.radius, quad_segs=8) for p in points]
-    tree = STRtree(discs)
+    cams = load_cameras(Path(args.cameras), crs)
+    buildings_path = Path(args.buildings)
+    if buildings_path.exists():
+        rings, tree = load_building_rings(buildings_path, crs)
+        print(f"Loaded {len(cams)} cameras, {len(rings)} building rings (shadowing ON)")
+    else:
+        rings, tree = [], None
+        print(
+            f"Loaded {len(cams)} cameras — {buildings_path} missing, "
+            f"zones are NOT building-clipped (run pipeline/fetch_buildings.py)"
+        )
+
+    print("Computing visibility zones ...")
+    zones, zone_cam = [], []
+    n_cones = 0
+    for cam in cams:
+        polys = visibility_zones(cam, rings, tree, args.radius, args.cone_radius)
+        if cam["directions"] and not cam["omni"]:
+            n_cones += len(polys)
+        for poly in polys:
+            zones.append(poly)
+            zone_cam.append(cam["id"])
+    zone_tree = STRtree(zones)
+    print(f"  {len(zones)} zones ({n_cones} view cones, rest discs)")
 
     total_len = 0.0
     total_exposed = 0.0
@@ -75,18 +234,20 @@ def main() -> int:
     for u, v, k, data in graph.edges(keys=True, data=True):
         geom = edge_geometry(graph, u, v, data)
         total_len += data.get("length", geom.length)
-        hits = tree.query(geom, predicate="intersects")
+        hits = zone_tree.query(geom, predicate="intersects")
         if len(hits) == 0:
             data["exposure"] = 0.0
+            data.pop("cameras", None)
             continue
-        exposure = geom.intersection(unary_union([discs[i] for i in hits])).length
+        exposure = geom.intersection(unary_union([zones[i] for i in hits])).length
         data["exposure"] = float(exposure)
-        data["cameras"] = [ids[i] for i in hits]
+        data["cameras"] = sorted({zone_cam[i] for i in hits})
         seen_cameras.update(data["cameras"])
         total_exposed += exposure
         exposed_edges += 1
 
     graph.graph["exposure_radius_m"] = args.radius
+    graph.graph["exposure_model"] = "cones+shadows" if tree is not None else "cones"
     with gzip.open(graph_path, "wb") as f:
         pickle.dump(graph, f, protocol=pickle.HIGHEST_PROTOCOL)
 

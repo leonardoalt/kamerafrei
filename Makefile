@@ -16,6 +16,9 @@ venv:
 cameras:
 	$(PY) pipeline/fetch_cameras.py
 
+buildings:
+	$(PY) pipeline/fetch_buildings.py
+
 graphs:
 	$(PY) pipeline/build_graph.py --profile both
 
@@ -32,11 +35,12 @@ verify-client:
 	$(PY) scripts/parity_check.py -n 50
 
 # Full Berlin build (network download is the slow part)
-berlin: cameras graphs exposure export-web
+berlin: cameras buildings graphs exposure export-web
 
 # Quick end-to-end test on a small Kreuzberg area
 test-area:
 	$(PY) pipeline/fetch_cameras.py --bbox $(TEST_BBOX)
+	$(PY) pipeline/fetch_buildings.py --bbox $(TEST_BBOX)
 	$(PY) pipeline/build_graph.py --profile both --point $(TEST_POINT) --dist $(TEST_DIST)
 	$(PY) pipeline/compute_exposure.py --graph data/graph_walk.pkl.gz
 	$(PY) pipeline/compute_exposure.py --graph data/graph_bike.pkl.gz

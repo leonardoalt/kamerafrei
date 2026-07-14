@@ -9,7 +9,10 @@ set -eu
 cd "$(dirname "$0")/.."
 
 # --build: `compose run` would otherwise reuse a stale image after git pull
-docker compose run --build --rm pipeline python pipeline/fetch_cameras.py
+docker compose run --build --rm pipeline sh -c "
+  python pipeline/fetch_cameras.py &&
+  python pipeline/fetch_buildings.py
+"
 
 docker compose stop kamerafrei
 docker compose run --rm pipeline sh -c "
