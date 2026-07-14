@@ -2,7 +2,7 @@
  * client-side. Response shape mirrors /api/route so the UI can't tell
  * whether the server or this worker answered. */
 
-import { parseGraph, nearestNode, route, routeCoords, edgeCoords } from "./router.js?v=22";
+import { parseGraph, nearestNode, route, routeCoords, exposedPieces } from "./router.js?v=23";
 
 const SPEED_KMH = { walk: 4.8, bike: 15.0 };
 
@@ -133,18 +133,9 @@ function describe(g, profile, result, alpha) {
   // segments follow the routing model (visibility-zone meters, per edge)
   const { n_cameras } = analyzeExposure(coords, g.meta.exposure_radius_m);
 
-  const pieces = [];
-  for (let k = 0; k < result.edges.length; k++) {
-    const e = result.edges[k];
-    if (g.exp[e] === 0) continue;
-    const ec = edgeCoords(g, result.nodes[k], e).map(([lat, lon]) => [lon, lat]);
-    const prev = pieces[pieces.length - 1];
-    if (prev && prev[prev.length - 1][0] === ec[0][0] && prev[prev.length - 1][1] === ec[0][1]) {
-      prev.push(...ec.slice(1));
-    } else {
-      pieces.push(ec);
-    }
-  }
+  const pieces = exposedPieces(g, result).map((piece) =>
+    piece.map(([lat, lon]) => [lon, lat])
+  );
 
   const speedMMin = (SPEED_KMH[profile] * 1000) / 60;
   return {

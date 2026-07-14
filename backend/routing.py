@@ -15,6 +15,7 @@ import numpy as np
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 from shapely.geometry import LineString, Point, mapping
+from shapely.ops import substring
 from shapely.ops import transform as shapely_transform
 from shapely.ops import unary_union
 from shapely.strtree import STRtree
@@ -162,9 +163,15 @@ class Router:
             edge_coords = self._edge_coords(u, v, data)
             if data.get("exposure", 0.0) > 0:
                 seen_m += data["exposure"]
-                if seen_pieces and seen_pieces[-1][-1] == edge_coords[0]:
-                    seen_pieces[-1].extend(edge_coords[1:])
-                else:
+                ivals = data.get("exposure_ivals")
+                if ivals:
+                    # exact sub-edge pieces along the stored edge geometry
+                    geom = data.get("geometry") or LineString(edge_coords)
+                    for t0, t1 in ivals:
+                        piece = substring(geom, t0, t1, normalized=True)
+                        if piece.geom_type == "LineString" and len(piece.coords) >= 2:
+                            seen_pieces.append(list(piece.coords))
+                else:  # pre-interval data: whole edge (coarse)
                     seen_pieces.append(list(edge_coords))
             if coords:
                 edge_coords = edge_coords[1:]

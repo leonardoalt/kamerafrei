@@ -19,7 +19,8 @@ docker compose run --rm pipeline sh -c "
   python pipeline/compute_exposure.py --graph data/graph_walk.pkl.gz &&
   python pipeline/compute_exposure.py --graph data/graph_bike.pkl.gz &&
   python pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin &&
-  python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+  python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin &&
+  python pipeline/export_zones.py
 "
 docker compose --profile prod up -d
 

@@ -57,6 +57,7 @@ jobs:
           python pipeline/compute_exposure.py --graph data/graph_bike.pkl.gz
           python pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin
           python pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+          python pipeline/export_zones.py
 
       - name: Publish release
         env:
@@ -69,5 +70,6 @@ jobs:
             data/cameras.geojson data/buildings.geojson \
             data/web/graph_walk.bin data/web/graph_walk.bin.gz \
             data/web/graph_bike.bin data/web/graph_bike.bin.gz \
+            data/web/zones.geojson data/web/zones.geojson.gz \
             --title "Berlin data $(date -u +%F)" \
             --notes "Automated weekly data build: OSM cameras + buildings re-fetched, cone+shadow exposure recomputed, web binaries exported. Data © OpenStreetMap contributors, ODbL."

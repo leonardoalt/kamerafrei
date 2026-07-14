@@ -389,7 +389,7 @@ const AVOIDANCE = [
   { alpha: 0, label: STR.levels[0], color: "#6b7280" },
   { alpha: 5, label: STR.levels[1], color: "#65a30d" },
   { alpha: 15, label: STR.levels[2], color: "#16a34a" },
-  { alpha: 60, label: STR.levels[3], color: "#166534" },
+  { alpha: 1000, label: STR.levels[3], color: "#166534" },
 ];
 
 function currentAvoidance() {
@@ -456,40 +456,23 @@ function cameraPopup(props) {
           <table class="cam-tags">${rows}</table>`;
 }
 
-// camera:direction is degrees clockwise from north, or a cardinal like "SW";
-// multiple directions are separated by ";"
-const CARDINALS = {
-  N: 0, NNE: 22.5, NE: 45, ENE: 67.5, E: 90, ESE: 112.5, SE: 135, SSE: 157.5,
-  S: 180, SSW: 202.5, SW: 225, WSW: 247.5, W: 270, WNW: 292.5, NW: 315, NNW: 337.5,
-};
-
-function parseDirections(value) {
-  if (value == null) return [];
-  return String(value)
-    .split(/[;,]/)
-    .map((s) => {
-      s = s.trim().toUpperCase();
-      if (s in CARDINALS) return CARDINALS[s];
-      const n = parseFloat(s);
-      return Number.isNaN(n) ? null : ((n % 360) + 360) % 360;
-    })
-    .filter((d) => d !== null);
-}
-
-// matches the routing model in pipeline/compute_exposure.py (cone 40 m ±35°)
-function coneLatLngs(latlng, bearing, radiusM = 40, halfAngle = 35) {
-  const points = [latlng];
-  const latScale = 111320;
-  const lngScale = 111320 * Math.cos((latlng.lat * Math.PI) / 180);
-  for (let a = bearing - halfAngle; a <= bearing + halfAngle + 0.01; a += 7.5) {
-    const rad = (a * Math.PI) / 180;
-    points.push([
-      latlng.lat + (Math.cos(rad) * radiusM) / latScale,
-      latlng.lng + (Math.sin(rad) * radiusM) / lngScale,
-    ]);
-  }
-  return points;
-}
+// visibility zones (cones AND discs, building-clipped) — the actual shapes
+// the router avoids, exported by pipeline/export_zones.py
+fetch("/web-data/zones.geojson?v=23")
+  .then((r) => (r.ok ? r.json() : null))
+  .then((zones) => {
+    if (!zones) return; // zones not exported yet: dots only
+    L.geoJSON(zones, {
+      style: {
+        renderer: canvas,
+        stroke: false,
+        fillColor: "#dc2626",
+        fillOpacity: 0.12,
+        interactive: false,
+      },
+    }).addTo(cameraLayer);
+  })
+  .catch(() => {});
 
 fetch("/api/cameras")
   .then((r) => {
@@ -516,21 +499,6 @@ fetch("/api/cameras")
       f.geometry.coordinates[0],
       0.6,
     ]);
-
-    for (const feat of geojson.features) {
-      const props = feat.properties;
-      if (props["camera:type"] === "dome") continue;
-      const [lng, lat] = feat.geometry.coordinates;
-      for (const bearing of parseDirections(props["camera:direction"])) {
-        L.polygon(coneLatLngs(L.latLng(lat, lng), bearing), {
-          renderer: canvas,
-          stroke: false,
-          fillColor: "#dc2626",
-          fillOpacity: 0.13,
-          interactive: false,
-        }).addTo(cameraLayer);
-      }
-    }
 
   })
   .catch((err) => setHint(err.message, true));
@@ -826,7 +794,7 @@ let localMsgId = 0;
 function initClientRouting(profile) {
   if (!CLIENT_MODE || localReady[profile]) return;
   if (!worker) {
-    worker = new Worker("worker.js?v=22", { type: "module" });
+    worker = new Worker("worker.js?v=23", { type: "module" });
     worker.onmessage = (e) => {
       const m = e.data;
       if (m.type === "ready" || m.type === "error" || m.type === "routeError")
@@ -857,7 +825,7 @@ function initClientRouting(profile) {
   worker.postMessage({
     type: "init",
     profile,
-    graphUrl: `/web-data/graph_${profile}.bin?v=22`,
+    graphUrl: `/web-data/graph_${profile}.bin?v=23`,
     camerasUrl: "/api/cameras",
   });
 }

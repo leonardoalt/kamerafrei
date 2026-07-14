@@ -105,6 +105,8 @@ def main() -> int:
     offsets = np.zeros(n + 1, dtype=np.uint32)
     targets, lengths_cm, exposures_dm, geom_idx = [], [], [], []
     geom_pool = bytearray()
+    ival_idx = []  # 0 = none, else offset+1 into ival_pool (uint16 units)
+    ival_pool = []  # per entry: count, then count * (t0, t1) scaled to 65535
     pruned = 0
     with_geom = 0
 
@@ -123,6 +125,16 @@ def main() -> int:
                 targets.append(index[v])
                 lengths_cm.append(length_cm)
                 exposures_dm.append(exposure_dm)
+
+                ivals = d.get("exposure_ivals") or []
+                if ivals:
+                    ival_idx.append(len(ival_pool) + 1)
+                    ival_pool.append(len(ivals))
+                    for t0, t1 in ivals:
+                        ival_pool.append(min(65535, round(t0 * 65535)))
+                        ival_pool.append(min(65535, round(t1 * 65535)))
+                else:
+                    ival_idx.append(0)
 
                 geom = d.get("geometry")
                 if wants_geometry(geom, length):
@@ -154,6 +166,8 @@ def main() -> int:
         ("edge_exposure_dm", np.array(exposures_dm, dtype=np.uint16)),
         ("geom_index", np.array(geom_idx, dtype=np.uint32)),
         ("geom_pool", np.frombuffer(bytes(geom_pool), dtype=np.uint8)),
+        ("exp_ival_idx", np.array(ival_idx, dtype=np.uint32)),
+        ("exp_ival_pool", np.array(ival_pool, dtype=np.uint16)),
     ]
 
     header = {

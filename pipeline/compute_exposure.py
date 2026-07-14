@@ -31,6 +31,16 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 from shapely.validation import make_valid
 
+
+def line_parts(geom):
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "LineString":
+        return [geom]
+    if geom.geom_type in ("MultiLineString", "GeometryCollection"):
+        return [p for g in geom.geoms for p in line_parts(g)]
+    return []
+
 DEFAULT_RADIUS = 25.0
 DEFAULT_CONE_RADIUS = 40.0
 CONE_HALF_ANGLE = 35.0
@@ -238,12 +248,24 @@ def main() -> int:
         if len(hits) == 0:
             data["exposure"] = 0.0
             data.pop("cameras", None)
+            data.pop("exposure_ivals", None)
             continue
-        exposure = geom.intersection(unary_union([zones[i] for i in hits])).length
-        data["exposure"] = float(exposure)
+        inter = geom.intersection(unary_union([zones[i] for i in hits]))
+        data["exposure"] = float(inter.length)
+        # normalized [t0, t1] intervals along the edge geometry: lets the UI
+        # paint exactly the seen meters instead of whole edges
+        ivals = []
+        for part in line_parts(inter):
+            t0 = geom.project(Point(part.coords[0])) / geom.length
+            t1 = geom.project(Point(part.coords[-1])) / geom.length
+            if t1 < t0:
+                t0, t1 = t1, t0
+            if t1 - t0 > 1e-6:
+                ivals.append((round(t0, 5), round(t1, 5)))
+        data["exposure_ivals"] = sorted(ivals)
         data["cameras"] = sorted({zone_cam[i] for i in hits})
         seen_cameras.update(data["cameras"])
-        total_exposed += exposure
+        total_exposed += data["exposure"]
         exposed_edges += 1
 
     graph.graph["exposure_radius_m"] = args.radius

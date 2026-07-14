@@ -29,6 +29,7 @@ exposure:
 export-web:
 	$(PY) pipeline/export_web.py --graph data/graph_walk.pkl.gz --out data/web/graph_walk.bin
 	$(PY) pipeline/export_web.py --graph data/graph_bike.pkl.gz --out data/web/graph_bike.bin
+	$(PY) pipeline/export_zones.py
 
 # client router must agree with the Python oracle
 verify-client:

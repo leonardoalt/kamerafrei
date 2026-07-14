@@ -30,6 +30,8 @@ export function parseGraph(buffer) {
     exp: view("edge_exposure_dm", Uint16Array),
     geomIdx: view("geom_index", Uint32Array),
     geomPool: view("geom_pool", Uint8Array),
+    expIdx: header.sections.exp_ival_idx ? view("exp_ival_idx", Uint32Array) : null,
+    expPool: header.sections.exp_ival_pool ? view("exp_ival_pool", Uint16Array) : null,
   };
 
   // meters per int32 coordinate unit (degrees * 1e7), for heuristics/snapping
@@ -246,6 +248,54 @@ export function edgeCoords(g, u, e) {
   }
   coords.push([g.lat[v] / cs, g.lon[v] / cs]);
   return coords;
+}
+
+/* exact red segments: interpolate the [t0,t1] exposure intervals (fractions
+ * of edge length) along each exposed edge's polyline */
+export function exposedPieces(g, result) {
+  const pieces = [];
+  for (let k = 0; k < result.edges.length; k++) {
+    const e = result.edges[k];
+    if (g.exp[e] === 0) continue;
+    const coords = edgeCoords(g, result.nodes[k], e);
+    if (!g.expIdx || g.expIdx[e] === 0) {
+      pieces.push(coords); // no interval data: whole edge (coarse fallback)
+      continue;
+    }
+    // cumulative planar lengths along the edge polyline
+    const cum = [0];
+    for (let i = 1; i < coords.length; i++) {
+      const dLat = (coords[i][0] - coords[i - 1][0]) * 111320;
+      const dLon = (coords[i][1] - coords[i - 1][1]) * 111320 * g.meta.cos_lat;
+      cum.push(cum[i - 1] + Math.hypot(dLat, dLon));
+    }
+    const total = cum[cum.length - 1] || 1;
+    const at = (t) => {
+      const target = t * total;
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < target) i++;
+      const seg = cum[i] - cum[i - 1] || 1;
+      const f = (target - cum[i - 1]) / seg;
+      return [
+        coords[i - 1][0] + (coords[i][0] - coords[i - 1][0]) * f,
+        coords[i - 1][1] + (coords[i][1] - coords[i - 1][1]) * f,
+      ];
+    };
+    let p = g.expIdx[e] - 1;
+    const count = g.expPool[p++];
+    for (let c = 0; c < count; c++) {
+      const t0 = g.expPool[p++] / 65535;
+      const t1 = g.expPool[p++] / 65535;
+      const piece = [at(t0)];
+      for (let i = 0; i < coords.length; i++) {
+        const t = cum[i] / total;
+        if (t > t0 && t < t1) piece.push(coords[i]);
+      }
+      piece.push(at(t1));
+      pieces.push(piece);
+    }
+  }
+  return pieces;
 }
 
 export function routeCoords(g, result) {

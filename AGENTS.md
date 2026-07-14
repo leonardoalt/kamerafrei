@@ -19,9 +19,13 @@ see DEPLOY.md)
 Every graph edge carries a precomputed `exposure` attribute: meters of the
 edge inside some camera's **visibility zone**. Zones (v2 model): cameras
 with `camera:direction` (and not dome/panning) see a cone (±35°, 40 m);
-everything else a 25 m disc; both are clipped by **building shadows** via
-ray casting against footprints near cameras (pipeline/fetch_buildings.py →
-compute_exposure.py). Routing minimizes
+everything else a 25 m disc (incl. dome/panning regardless of direction);
+both are clipped by **building shadows** via ray casting against footprints
+near cameras (pipeline/fetch_buildings.py → compute_exposure.py). Edges also
+carry `exposure_ivals` (normalized sub-edge intervals) so the UI paints
+exactly the seen meters; export_zones.py publishes the zone polygons as
+web-data/zones.geojson so the map shows the very shapes the router avoids.
+Slider "max" = α 1000 (a real never-be-seen mode). Routing minimizes
 
     cost(edge) = length + α · exposure
 
